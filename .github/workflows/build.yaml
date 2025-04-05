@@ -14,10 +14,10 @@ on:
         type: choice
         description: "The environment to build the configuration for"
         options:
-          - dev
-          - acc
-          - prd
-        default: dev
+          - development
+          - acceptance
+          - production
+        default: development
 
 env:
   KONNECT_API_URL: https://eu.api.konghq.com
@@ -169,13 +169,14 @@ jobs:
           name: artifacts-${{ matrix.api.name }}-${{ matrix.api.version }}-${{ inputs.environment }}
           path: |
             ${{ env.OUTPUT_DIR }}/kong.yaml
-            ${{ env.OUTPUT_DIR }}/deck_diff.txt
 
   deploy:
     needs:
       - get-apis
       - build
     runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
     env:
       API_SPEC: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/openapi.yaml
       API_KONG_DIR: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/kong
