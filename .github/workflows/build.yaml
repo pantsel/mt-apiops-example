@@ -5,14 +5,13 @@ on:
     inputs:
       entity:
         required: true
-        type: string
+        type: choice
         description: "The entity to build the configuration for"
         options:
-          - entity-1
-          - entity-2
+          - tripwhiz
       environment:
         required: true
-        type: string
+        type: choice
         description: "The environment to build the configuration for"
         options:
           - dev
