@@ -43,6 +43,7 @@ jobs:
           echo "apis=$APIS" >> $GITHUB_OUTPUT
 
   build:
+    name: Build ${{ matrix.api.name }}-${{ matrix.api.version }} on ${{ inputs.entity }} ${{ inputs.environment }}
     needs: get-apis
     runs-on: ubuntu-latest
     env:
@@ -171,6 +172,7 @@ jobs:
             ${{ env.OUTPUT_DIR }}/kong.yaml
 
   deploy:
+    name: Deploy ${{ matrix.api.name }}-${{ matrix.api.version }} on ${{ inputs.entity }} ${{ inputs.environment }}
     needs:
       - get-apis
       - build
