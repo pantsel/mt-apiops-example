@@ -1,7 +1,10 @@
 name: Deploy
 
 on:
-  workflow_dispatch:
+  workflow_run:
+    workflows: ["build"]
+    types:
+      - completed
     inputs:
       entity:
         required: true
@@ -55,6 +58,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: artifacts-${{ matrix.api.name }}-${{ matrix.api.version }}-${{ inputs.environment }}
+
       - uses: kong/setup-deck@v1
 
       - name: Source env.${{ inputs.environment }}.sh
@@ -82,19 +90,7 @@ jobs:
 
           # Set the deck file namespace path prefix
           echo "DECK_FILE_NAMESPACE_PATH_PREFIX=${{ matrix.api.namespace }}" >> $GITHUB_ENV
-      
-      - name: Lint OpenAPI Spec
-        run: |
-          deck file lint -s $API_SPEC $PLATFORM_DIR/openapi.ruleset.yaml
-
-      - name: Convert OpenAPI Spec to Kong declarative config
-        run: |
-          cat ${{ env.API_SPEC }} | deck file openapi2kong --generate-security -o $OUTPUT_DIR/kong.yaml
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: artifacts-${{ matrix.api.name }}-${{ matrix.api.version }}-${{ inputs.environment }}
+  
       
       - name: Get a backup of the previous Kong Gateway configuration
         run: |
