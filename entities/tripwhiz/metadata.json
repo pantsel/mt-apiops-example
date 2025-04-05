@@ -1,5 +1,4 @@
 {
-    "name": "entity-1",
     "apis": [
         {
             "name": "flights",
