@@ -4,12 +4,14 @@
         {
             "name": "flights",
             "version": "v1",
-            "enabled": true
+            "enabled": true,
+            "namespace": "/entity-1/flights/v1"
         },
         {
             "name": "routes",
             "version": "v1",
-            "enabled": true
+            "enabled": true,
+            "namespace": "/entity-1/routes/v1"
         }
     ]
 }

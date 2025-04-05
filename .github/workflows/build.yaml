@@ -40,7 +40,7 @@ jobs:
       - name: Get enabled APIs from metadata
         id: set-apis
         run: |
-          APIS=$(jq -c '[.apis[] | select(.enabled==true) | {name: .name, version: .version}]' $ENTITY_METADATA)
+          APIS=$(jq -c '[.apis[] | select(.enabled==true) | . ]' $ENTITY_METADATA)
           echo "apis=$APIS" >> $GITHUB_OUTPUT
 
   build:
@@ -88,8 +88,8 @@ jobs:
           echo "DECK_API_MAJOR_VERSION=$api_major_version" >> $GITHUB_ENV
 
           # Set the deck file namespace path prefix
-          DECK_FILE_NAMESPACE_PATH_PREFIX="/${{ inputs.entity }}/${api_name}/v${api_major_version}"
-          echo "DECK_FILE_NAMESPACE_PATH_PREFIX=$DECK_FILE_NAMESPACE_PATH_PREFIX" >> $GITHUB_ENV
+          deck_file_namespace_path_prefix="${{ matrix.api.namespace }}"
+          echo "DECK_FILE_NAMESPACE_PATH_PREFIX=$deck_file_namespace_path_prefix" >> $GITHUB_ENV
       
       - name: Lint OpenAPI Spec
         run: |
@@ -178,70 +178,70 @@ jobs:
           path: |
             ${{ env.OUTPUT_DIR }}/kong.yaml
 
-  deploy:
-    needs:
-      - get-apis
-      - build
-    runs-on: ubuntu-latest
-    env:
-      API_SPEC: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/openapi.yaml
-      API_KONG_DIR: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/kong
-    strategy:
-      matrix:
-        api: ${{ fromJson(needs.get-apis.outputs.apis) }}
-    steps:
-      - uses: actions/checkout@v4
+  # deploy:
+  #   needs:
+  #     - get-apis
+  #     - build
+  #   runs-on: ubuntu-latest
+  #   env:
+  #     API_SPEC: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/openapi.yaml
+  #     API_KONG_DIR: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/kong
+  #   strategy:
+  #     matrix:
+  #       api: ${{ fromJson(needs.get-apis.outputs.apis) }}
+  #   steps:
+  #     - uses: actions/checkout@v4
 
-      - uses: kong/setup-deck@v1
+  #     - uses: kong/setup-deck@v1
 
-      - name: Source env.${{ inputs.environment }}.sh
-        run: |
-          set -a
-          source ./env.${{ inputs.environment }}.sh
-          set +a
+  #     - name: Source env.${{ inputs.environment }}.sh
+  #       run: |
+  #         set -a
+  #         source ./env.${{ inputs.environment }}.sh
+  #         set +a
 
-          env | grep '^DECK_' >> "$GITHUB_ENV"
+  #         env | grep '^DECK_' >> "$GITHUB_ENV"
 
-        working-directory: ${{ env.ENTITY_DIR }}
+  #       working-directory: ${{ env.ENTITY_DIR }}
 
-      - name: Setup extra decK variables from spec
-        run: |
+  #     - name: Setup extra decK variables from spec
+  #       run: |
 
-          # Set the API URL
-          api_url="https://${{ inputs.entity }}-${{ inputs.environment }}.${{ matrix.api.name }}.svc.cluster.local:8000"
-          echo "DECK_API_URL=$api_url" >> $GITHUB_ENV
+  #         # Set the API URL
+  #         api_url="https://${{ inputs.entity }}-${{ inputs.environment }}.${{ matrix.api.name }}.svc.cluster.local:8000"
+  #         echo "DECK_API_URL=$api_url" >> $GITHUB_ENV
 
-          # Set the API Name
-          api_name=$(yq eval '.info.title' ${{ env.API_SPEC }} | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
-          echo "DECK_API_NAME=$api_name" >> $GITHUB_ENV
+  #         # Set the API Name
+  #         api_name=$(yq eval '.info.title' ${{ env.API_SPEC }} | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+  #         echo "DECK_API_NAME=$api_name" >> $GITHUB_ENV
 
-          # Set the API Version
-          api_version=$(yq eval '.info.version' ${{ env.API_SPEC }} | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
-          echo "DECK_API_VERSION=$api_version" >> $GITHUB_ENV
+  #         # Set the API Version
+  #         api_version=$(yq eval '.info.version' ${{ env.API_SPEC }} | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+  #         echo "DECK_API_VERSION=$api_version" >> $GITHUB_ENV
 
-          # Set API Major version
-          api_major_version=$(echo $api_version | cut -d '.' -f 1)
-          echo "DECK_API_MAJOR_VERSION=$api_major_version" >> $GITHUB_ENV
+  #         # Set API Major version
+  #         api_major_version=$(echo $api_version | cut -d '.' -f 1)
+  #         echo "DECK_API_MAJOR_VERSION=$api_major_version" >> $GITHUB_ENV
 
-          # Set the deck file namespace path prefix
-          DECK_FILE_NAMESPACE_PATH_PREFIX="/${{ inputs.entity }}/${api_name}/v${api_major_version}"
-          echo "DECK_FILE_NAMESPACE_PATH_PREFIX=$DECK_FILE_NAMESPACE_PATH_PREFIX" >> $GITHUB_ENV
+  #         # Set the deck file namespace path prefix
+  #         DECK_FILE_NAMESPACE_PATH_PREFIX="/${{ inputs.entity }}/${api_name}/v${api_major_version}"
+  #         echo "DECK_FILE_NAMESPACE_PATH_PREFIX=$DECK_FILE_NAMESPACE_PATH_PREFIX" >> $GITHUB_ENV
 
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: artifacts-${{ matrix.api.name }}-${{ matrix.api.version }}-${{ inputs.environment }}
+  #     - name: Download artifacts
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: artifacts-${{ matrix.api.name }}-${{ matrix.api.version }}-${{ inputs.environment }}
       
-      - name: Get a backup of the previous Kong Gateway configuration
-        run: |
-          deck gateway dump \
-            --konnect-addr="${{ env.KONNECT_API_URL }}" \
-            --konnect-token="${{ secrets.KONNECT_TOKEN }}" \
-            --konnect-control-plane-name="${{ env.KONNECT_CONTROL_PLANE_NAME }}" -o kong_backup.yaml
+  #     - name: Get a backup of the previous Kong Gateway configuration
+  #       run: |
+  #         deck gateway dump \
+  #           --konnect-addr="${{ env.KONNECT_API_URL }}" \
+  #           --konnect-token="${{ secrets.KONNECT_TOKEN }}" \
+  #           --konnect-control-plane-name="${{ env.KONNECT_CONTROL_PLANE_NAME }}" -o kong_backup.yaml
 
-      - name: Sync Kong Gateway configuration
-        run: |
-          deck gateway sync kong.yaml  \
-            --konnect-addr="${{ env.KONNECT_API_URL }}" \
-            --konnect-token="${{ secrets.KONNECT_TOKEN }}" \
-            --konnect-control-plane-name="${{ env.KONNECT_CONTROL_PLANE_NAME }}"
+  #     - name: Sync Kong Gateway configuration
+  #       run: |
+  #         deck gateway sync kong.yaml  \
+  #           --konnect-addr="${{ env.KONNECT_API_URL }}" \
+  #           --konnect-token="${{ secrets.KONNECT_TOKEN }}" \
+  #           --konnect-control-plane-name="${{ env.KONNECT_CONTROL_PLANE_NAME }}"
