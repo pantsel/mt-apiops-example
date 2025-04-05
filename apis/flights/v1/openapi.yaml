@@ -4,7 +4,7 @@ openapi: 3.1.0
 
 info:
   description: KongAir Flights service provides the scheduled flights for KongAir
-  version: 0.1.0
+  version: 1.0.0
   title: Flights Service
 
 servers:
@@ -14,6 +14,7 @@ servers:
 paths:
   /health:
     get:
+      operationId: health-check-v1
       summary: Health check endpoint for Kubernetes
       description: Endpoint that returns the service health status.
       responses:
@@ -49,7 +50,7 @@ paths:
         Returns all the scheduled flights for a given day
       tags:
       - flight-data
-      operationId: get-flights
+      operationId: get-flights-v1
       parameters:
         - name: date
           in: query
@@ -98,7 +99,7 @@ paths:
         Returns a specific flight given its flight number
       tags:
       - flight-data
-      operationId: get-flight-by-number
+      operationId: get-flight-by-number-v1
       parameters:
         - name: flightNumber
           in: path
@@ -211,5 +212,5 @@ components:
       required:
         - flight_number
         - in_flight_entertainment
-        - mean_options
+        - meal_options
         - aircraft_type

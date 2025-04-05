@@ -4,7 +4,7 @@ openapi: 3.1.0
 
 info:
   description: KongAir Routes service provides the registered routes KongAir flies between origin and destination airports
-  version: 0.1.0
+  version: 1.0.0
   title: Routes Service
 
 servers:
@@ -16,6 +16,7 @@ paths:
     get:
       summary: Health check endpoint for Kubernetes
       description: Endpoint that returns the service health status.
+      operationId: health-check-v1
       responses:
         '200':
           description: Service is healthy
@@ -44,7 +45,7 @@ paths:
         Returns a specific route from a given Route ID
       tags:
       - flight-data
-      operationId: get-route
+      operationId: get-route-v1
       parameters:
         - name: id
           in: path
@@ -69,7 +70,7 @@ paths:
         A Route is a pairing between origin and destination airport codes.
       tags:
       - flight-data
-      operationId: get-routes
+      operationId: get-routes-v1
       parameters:
         - name: origin
           in: query

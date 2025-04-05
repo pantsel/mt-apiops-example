@@ -1,0 +1,10 @@
+---
+_format_version: '3.0'
+add-plugins:
+- selectors:
+  - "$..services[0].routes[?(@.name=='routes-service_health-check-v1')]"
+  overwrite: false
+  plugins:
+    - name: route-transformer-advanced
+      config:
+        port: "5432"

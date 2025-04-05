@@ -1,0 +1,1 @@
+export DECK_CONFIG_OIDC_ISSUER="https://auth.example.com/auth/realms/master/.well-known/openid-configuration"

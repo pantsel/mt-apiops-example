@@ -1,0 +1,15 @@
+{
+    "name": "entity-1",
+    "apis": [
+        {
+            "name": "flights",
+            "version": "v1",
+            "enabled": true
+        },
+        {
+            "name": "routes",
+            "version": "v1",
+            "enabled": true
+        }
+    ]
+}

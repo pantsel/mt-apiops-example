@@ -1,0 +1,247 @@
+name: Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      entity:
+        required: true
+        type: string
+        description: "The entity to build the configuration for"
+        options:
+          - entity-1
+          - entity-2
+      environment:
+        required: true
+        type: string
+        description: "The environment to build the configuration for"
+        options:
+          - dev
+          - acc
+          - prd
+        default: dev
+
+env:
+  KONNECT_API_URL: https://eu.api.konghq.com
+  KONNECT_CONTROL_PLANE_NAME: ${{ inputs.entity }}-${{ inputs.environment }}
+  APIS_DIR: ${{ github.workspace }}/apis
+  ENTITY_DIR: ${{ github.workspace }}/entities/${{ inputs.entity }}
+  ENTITY_METADATA: ${{ github.workspace }}/entities/${{ inputs.entity }}/metadata.json
+  ENTITY_KONG_DIR: ${{ github.workspace }}/entities/${{ inputs.entity }}/kong
+  OUTPUT_DIR: ${{ github.workspace }}/.generated
+  PLATFORM_DIR: ${{ github.workspace }}/platform
+
+jobs:
+  get-apis:
+    runs-on: ubuntu-latest
+    outputs:
+      apis: ${{ steps.set-apis.outputs.apis }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get enabled APIs from metadata
+        id: set-apis
+        run: |
+          APIS=$(jq -c '[.apis[] | select(.enabled==true) | {name: .name, version: .version}]' $ENTITY_METADATA)
+          echo "apis=$APIS" >> $GITHUB_OUTPUT
+
+  build:
+    needs: get-apis
+    runs-on: ubuntu-latest
+    env:
+      API_SPEC: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/openapi.yaml
+      API_KONG_DIR: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/kong
+    strategy:
+      matrix:
+        api: ${{ fromJson(needs.get-apis.outputs.apis) }}
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: kong/setup-deck@v1
+
+      - name: Source env.${{ inputs.environment }}.sh
+        run: |
+          set -a
+          source ./env.${{ inputs.environment }}.sh
+          set +a
+
+          env | grep '^DECK_' >> "$GITHUB_ENV"
+
+        working-directory: ${{ env.ENTITY_DIR }}
+
+      - name: Setup extra decK variables
+        run: |
+
+          # Set the API URL
+          api_url="https://${{ inputs.entity }}-${{ inputs.environment }}.${{ matrix.api.name }}.svc.cluster.local:8000"
+          echo "DECK_API_URL=$api_url" >> $GITHUB_ENV
+
+          # Set the API Name
+          api_name=$(yq eval '.info.title' ${{ env.API_SPEC }} | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+          echo "DECK_API_NAME=$api_name" >> $GITHUB_ENV
+
+          # Set the API Version
+          api_version=$(yq eval '.info.version' ${{ env.API_SPEC }} | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+          echo "DECK_API_VERSION=$api_version" >> $GITHUB_ENV
+
+          # Set API Major version
+          api_major_version=$(echo $api_version | cut -d '.' -f 1)
+          echo "DECK_API_MAJOR_VERSION=$api_major_version" >> $GITHUB_ENV
+
+          # Set the deck file namespace path prefix
+          DECK_FILE_NAMESPACE_PATH_PREFIX="/${{ inputs.entity }}/${api_name}/v${api_major_version}"
+          echo "DECK_FILE_NAMESPACE_PATH_PREFIX=$DECK_FILE_NAMESPACE_PATH_PREFIX" >> $GITHUB_ENV
+      
+      - name: Lint OpenAPI Spec
+        run: |
+          deck file lint -s $API_SPEC $PLATFORM_DIR/openapi.ruleset.yaml
+
+      - name: Convert OpenAPI Spec to Kong declarative config
+        run: |
+          cat ${{ env.API_SPEC }} | deck file openapi2kong --generate-security -o $OUTPUT_DIR/kong.yaml
+
+      - name: Add plugins (API)
+        run: |
+          # if ./plugins exists, and has at least one file .yaml file, apply the plugins
+          if [ -d "./plugins" ] && [ "$(ls -A ./plugins/*.yaml 2>/dev/null)" ]; then
+            cat $OUTPUT_DIR/kong.yaml | deck file add-plugins ./plugins/*.yaml -o $OUTPUT_DIR/kong.yaml
+          else
+            echo "No API level plugins found for ${{ matrix.api.name }}/${{ matrix.api.version }}"
+          fi
+        working-directory: ${{ env.API_KONG_DIR }}
+
+      - name: Add plugins (Entity)
+        run: |
+          # if ./plugins exists, and has at least one file .yaml file, apply the plugins
+          if [ -d "./plugins" ] && [ "$(ls -A ./plugins/*.yaml 2>/dev/null)" ]; then
+            cat $OUTPUT_DIR/kong.yaml | deck file add-plugins ./plugins/*.yaml -o $OUTPUT_DIR/kong.yaml
+          else
+            echo "No Entity level plugins found for ${{ inputs.entity }}"
+          fi
+        working-directory: ${{ env.ENTITY_KONG_DIR }}
+
+      - name: Apply patches (Entity)
+        run: |
+          # if ./patches exists, and has at least one file .yaml file, apply the patches
+          if [ -d "./patches" ] && [ "$(ls -A ./patches/*.yaml 2>/dev/null)" ]; then
+            cat $OUTPUT_DIR/kong.yaml | deck file patch ./patches/*.yaml -o $OUTPUT_DIR/kong.yaml
+          else
+            echo "No Entity level patches found for ${{ inputs.entity }}"
+          fi
+        working-directory: ${{ env.ENTITY_KONG_DIR }}
+
+      - name: Add Tags
+        run: |
+          cat $OUTPUT_DIR/kong.yaml | deck file add-tags $DECK_API_NAME v$DECK_API_MAJOR_VERSION apiops -o $OUTPUT_DIR/kong.yaml
+        working-directory: ${{ env.ENTITY_KONG_DIR }}
+
+      - name: Add namespace if required
+        run: |
+          if [ -n "$DECK_FILE_NAMESPACE_PATH_PREFIX" ] || [ -n "$DECK_FILE_NAMESPACE_HOST" ]; then
+            cmd="deck file namespace"
+          if [ -n "$DECK_FILE_NAMESPACE_PATH_PREFIX" ]; then
+            cmd="$cmd --path-prefix=$DECK_FILE_NAMESPACE_PATH_PREFIX"
+          fi
+          if [ -n "$DECK_FILE_NAMESPACE_HOST" ]; then
+            cmd="$cmd --host=$DECK_FILE_NAMESPACE_HOST"
+          fi
+            cat kong.yaml | $cmd -o kong.yaml
+          else
+            echo "Skipping namespace step as both path-prefix and host are empty."
+          fi
+        working-directory:  ${{ env.OUTPUT_DIR }}
+
+      - name: Lint Kong Gateway configuration file
+        run: |
+          deck file lint -s kong.yaml ${{ env.PLATFORM_DIR }}/kong.ruleset.yaml;
+        working-directory: ${{ env.OUTPUT_DIR }}
+
+      - name: Debug Kong declarative config
+        run: |
+          cat $OUTPUT_DIR/kong.yaml
+
+      - name: Validate Generated Kong Gateway configuration
+        run: deck file validate kong.yaml
+        working-directory: ${{ env.OUTPUT_DIR }}
+
+      - name: Diff Kong Gateway configuration
+        run: |
+          deck gateway diff kong.yaml  \
+            --konnect-addr="${{ env.KONNECT_API_URL }}" \
+            --konnect-token="${{ secrets.KONNECT_TOKEN }}" \
+            --konnect-control-plane-name="${{ env.KONNECT_CONTROL_PLANE_NAME }}" > diff_${{ env.NOW }}.txt
+        working-directory: ${{ env.OUTPUT_DIR }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-${{ matrix.api.name }}-${{ matrix.api.version }}-${{ inputs.environment }}
+          path: |
+            ${{ env.OUTPUT_DIR }}/kong.yaml
+
+  deploy:
+    needs:
+      - get-apis
+      - build
+    runs-on: ubuntu-latest
+    env:
+      API_SPEC: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/openapi.yaml
+      API_KONG_DIR: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/kong
+    strategy:
+      matrix:
+        api: ${{ fromJson(needs.get-apis.outputs.apis) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: kong/setup-deck@v1
+
+      - name: Source env.${{ inputs.environment }}.sh
+        run: |
+          set -a
+          source ./env.${{ inputs.environment }}.sh
+          set +a
+
+          env | grep '^DECK_' >> "$GITHUB_ENV"
+
+        working-directory: ${{ env.ENTITY_DIR }}
+
+      - name: Setup extra decK variables from spec
+        run: |
+
+          # Set the API URL
+          api_url="https://${{ inputs.entity }}-${{ inputs.environment }}.${{ matrix.api.name }}.svc.cluster.local:8000"
+          echo "DECK_API_URL=$api_url" >> $GITHUB_ENV
+
+          # Set the API Name
+          api_name=$(yq eval '.info.title' ${{ env.API_SPEC }} | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+          echo "DECK_API_NAME=$api_name" >> $GITHUB_ENV
+
+          # Set the API Version
+          api_version=$(yq eval '.info.version' ${{ env.API_SPEC }} | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+          echo "DECK_API_VERSION=$api_version" >> $GITHUB_ENV
+
+          # Set API Major version
+          api_major_version=$(echo $api_version | cut -d '.' -f 1)
+          echo "DECK_API_MAJOR_VERSION=$api_major_version" >> $GITHUB_ENV
+
+          # Set the deck file namespace path prefix
+          DECK_FILE_NAMESPACE_PATH_PREFIX="/${{ inputs.entity }}/${api_name}/v${api_major_version}"
+          echo "DECK_FILE_NAMESPACE_PATH_PREFIX=$DECK_FILE_NAMESPACE_PATH_PREFIX" >> $GITHUB_ENV
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: artifacts-${{ matrix.api.name }}-${{ matrix.api.version }}-${{ inputs.environment }}
+      
+      - name: Get a backup of the previous Kong Gateway configuration
+        run: |
+          deck gateway dump \
+            --konnect-addr="${{ env.KONNECT_API_URL }}" \
+            --konnect-token="${{ secrets.KONNECT_TOKEN }}" \
+            --konnect-control-plane-name="${{ env.KONNECT_CONTROL_PLANE_NAME }}" -o kong_backup.yaml
+
+      - name: Sync Kong Gateway configuration
+        run: |
+          deck gateway sync kong.yaml  \
+            --konnect-addr="${{ env.KONNECT_API_URL }}" \
+            --konnect-token="${{ secrets.KONNECT_TOKEN }}" \
+            --konnect-control-plane-name="${{ env.KONNECT_CONTROL_PLANE_NAME }}"

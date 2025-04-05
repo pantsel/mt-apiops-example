@@ -1,0 +1,11 @@
+extends: [[spectral:oas, recommended]]
+
+rules:
+  operation-id-required:
+    description: "Every OpenAPI operation must have an operationId specified."
+    message: "Operation object is missing operationId."
+    severity: error
+    given: "$.paths[*][*]"
+    then:
+      field: operationId
+      function: truthy

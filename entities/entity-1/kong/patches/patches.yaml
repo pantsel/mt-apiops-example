@@ -1,0 +1,17 @@
+---
+_format_version: '3.0'
+patches:
+- selectors:
+  - "$..services[0]"
+  values:
+    name: ${{ env "DECK_API_NAME" }}-v${{ env "DECK_API_MAJOR_VERSION" }}
+    url: ${{ env "DECK_API_URL" }}
+  remove:
+    - host
+    - port
+    - path
+    - protocol
+- selectors:
+  - "$..services[0].plugins[?(@.name == 'openid-connect')].config"
+  values:
+    issuer: ${{ env "DECK_CONFIG_OIDC_ISSUER"}}
