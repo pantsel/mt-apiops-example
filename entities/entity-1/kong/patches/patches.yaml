@@ -4,7 +4,7 @@ patches:
 - selectors:
   - "$..services[0]"
   values:
-    name: ${{ env "DECK_API_NAME" }}-v${{ env "DECK_API_MAJOR_VERSION" }}
+    name: ${{ env "DECK_API_NAME" }}-${{ env "DECK_API_VERSION" }}
     url: ${{ env "DECK_API_URL" }}
   remove:
     - host

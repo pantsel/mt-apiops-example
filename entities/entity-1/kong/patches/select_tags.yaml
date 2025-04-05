@@ -8,4 +8,4 @@ patches:
       defaults: {}
       select_tags:
       - ${{ env "DECK_API_NAME" }}
-      - v${{ env "DECK_API_MAJOR_VERSION" }}
+      - ${{ env "DECK_API_VERSION" }}

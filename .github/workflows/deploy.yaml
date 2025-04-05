@@ -76,20 +76,21 @@ jobs:
           echo "DECK_API_URL=$api_url" >> $GITHUB_ENV
 
           # Set the API Name
-          api_name=$(yq eval '.info.title' ${{ env.API_SPEC }} | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
-          echo "DECK_API_NAME=$api_name" >> $GITHUB_ENV
+          echo "DECK_API_NAME=${{ matrix.api.name }}" >> $GITHUB_ENV
 
           # Set the API Version
-          api_version=$(yq eval '.info.version' ${{ env.API_SPEC }} | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
-          echo "DECK_API_VERSION=$api_version" >> $GITHUB_ENV
-
-          # Set API Major version
-          api_major_version=$(echo $api_version | cut -d '.' -f 1)
-          echo "DECK_API_MAJOR_VERSION=$api_major_version" >> $GITHUB_ENV
+          echo "DECK_API_VERSION=${{ matrix.api.version }}" >> $GITHUB_ENV
 
           # Set the deck file namespace path prefix
-          deck_file_namespace_path_prefix="${{ matrix.api.namespace }}"
-          echo "DECK_FILE_NAMESPACE_PATH_PREFIX=$deck_file_namespace_path_prefix" >> $GITHUB_ENV
+          echo "DECK_FILE_NAMESPACE_PATH_PREFIX=${{ matrix.api.namespace }}" >> $GITHUB_ENV
+      
+      - name: Lint OpenAPI Spec
+        run: |
+          deck file lint -s $API_SPEC $PLATFORM_DIR/openapi.ruleset.yaml
+
+      - name: Convert OpenAPI Spec to Kong declarative config
+        run: |
+          cat ${{ env.API_SPEC }} | deck file openapi2kong --generate-security -o $OUTPUT_DIR/kong.yaml
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
