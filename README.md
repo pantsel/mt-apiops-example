@@ -47,12 +47,12 @@ This repository contains an example of API Operations (APIOps) implementation us
 
 ## API Documentation
 
-The project includes two main API categories:
+The project includes two APIs:
 
 - **Flights API**: Handles flight-related operations
 - **Routes API**: Manages route-related operations
 
-Each API is documented using OpenAPI specifications.
+Each API is documented using OpenAPI specifications and defines API level plugins and patches.
 
 ## CI/CD
 
