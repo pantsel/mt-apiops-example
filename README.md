@@ -45,16 +45,6 @@ This repository contains an example of API Operations (APIOps) implementation us
 └── .gitignore                         # Git ignore rules
 ```
 
-## Configuration
-
-The project uses the following configuration files:
-
-- `governance/kong.ruleset.yaml`: Defines Kong-specific rules and policies
-- `governance/openapi.ruleset.yaml`: Contains OpenAPI validation rules
-- `.deck.yaml`: Deck configuration for Kong Gateway
-- `act.secrets`: Secrets for local development with Act
-- `.actrc`: Act configuration for local development
-
 ## API Documentation
 
 The project includes two main API categories:
@@ -117,8 +107,9 @@ The workflows support multiple environments:
 - Creates tagged backups before deployment
 - Implements automatic rollback on failure
 - Uses governance rules for validation
+  - `governance/kong.ruleset.yaml`: Defines Kong-configuration specific rules and policies
+  - `governance/openapi.ruleset.yaml`: Contains OpenAPI validation rules
 - Supports optional configuration preview and diff review
-- Waits for changes to propagate before testing
 - Maintains backup history with generated_by:apiops tag
 
 ### Build and Deploy Process Flow
