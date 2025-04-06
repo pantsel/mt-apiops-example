@@ -131,7 +131,7 @@ graph TD
     N -->|2| P[Create Backup]
     N -->|3| Q[Sync to Gateway]
     Q -->|Success| R[Wait & Test]
-    R -->|Success| S[Upload Backup]
+    R -->|Success| S[Create & Upload Backup]
     R -->|Failure| T[Rollback]
     T -->|Restore| U[Previous Backup]
     S -->|Complete| V[End]
