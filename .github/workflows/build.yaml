@@ -125,11 +125,6 @@ jobs:
           fi
         working-directory: ${{ env.ENTITY_KONG_DIR }}
 
-      - name: Add Tags
-        run: |
-          cat $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml | deck file add-tags $DECK_API_NAME $DECK_API_VERSION -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
-        working-directory: ${{ env.ENTITY_KONG_DIR }}
-
       - name: Add namespace if required
         run: |
           if [ -n "$DECK_FILE_NAMESPACE_PATH_PREFIX" ] || [ -n "$DECK_FILE_NAMESPACE_HOST" ]; then
@@ -145,6 +140,11 @@ jobs:
             echo "Skipping namespace step as both path-prefix and host are empty."
           fi
         working-directory:  ${{ env.OUTPUT_DIR }}
+
+      - name: Add Tags
+        run: |
+          cat $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml | deck file add-tags $DECK_API_NAME $DECK_API_VERSION -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
+        working-directory: ${{ env.ENTITY_KONG_DIR }}
 
       - name: Lint Kong Gateway configuration file
         run: |
