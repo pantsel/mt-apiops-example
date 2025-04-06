@@ -34,7 +34,6 @@ This repository contains an example of API Operations (APIOps) implementation us
 │       │   ├── plugins/               # Entity-level plugins
 │       │   └── patches/               # Entity-level patches
 │       ├── env.sh                     # Common environment variables
-│       └── metadata.json              # Entity metadata
 ├── governance/                        # Governance configuration
 │   ├── kong/                          # Kong Gateway configuration
 │   │   ├── plugins/                   # Governance-level plugins
