@@ -175,6 +175,13 @@ jobs:
             -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
         working-directory: ${{ env.OUTPUT_DIR }}
 
+      - name: Show config in summary
+        run: |
+            echo "### 🔧 Config Preview" >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            cat $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -195,34 +202,34 @@ jobs:
 
       - uses: kong/setup-deck@v1
 
-      - name: Source env.${{ inputs.environment }}.sh
-        run: |
-          set -a
-          source ./env.${{ inputs.environment }}.sh
-          set +a
+      # - name: Source env.${{ inputs.environment }}.sh
+      #   run: |
+      #     set -a
+      #     source ./env.${{ inputs.environment }}.sh
+      #     set +a
 
-          env | grep '^DECK_' >> "$GITHUB_ENV"
+      #     env | grep '^DECK_' >> "$GITHUB_ENV"
 
-        working-directory: ${{ env.ENTITY_DIR }}
+      #   working-directory: ${{ env.ENTITY_DIR }}
 
-      - name: Setup extra decK variables
-        run: |
+      # - name: Setup extra decK variables
+      #   run: |
 
-          # Set the API URL
-          api_url="https://${{ inputs.entity }}-${{ inputs.environment }}.${{ matrix.api.name }}.svc.cluster.local:8000"
-          echo "DECK_API_URL=$api_url" >> $GITHUB_ENV
+      #     # Set the API URL
+      #     api_url="https://${{ inputs.entity }}-${{ inputs.environment }}.${{ matrix.api.name }}.svc.cluster.local:8000"
+      #     echo "DECK_API_URL=$api_url" >> $GITHUB_ENV
 
-          # Set the API Name
-          echo "DECK_API_NAME=${{ matrix.api.name }}" >> $GITHUB_ENV
+      #     # Set the API Name
+      #     echo "DECK_API_NAME=${{ matrix.api.name }}" >> $GITHUB_ENV
 
-          # Set the API Version
-          echo "DECK_API_VERSION=${{ matrix.api.version }}" >> $GITHUB_ENV
+      #     # Set the API Version
+      #     echo "DECK_API_VERSION=${{ matrix.api.version }}" >> $GITHUB_ENV
 
-          # Set the deck file namespace path prefix
-          echo "DECK_FILE_NAMESPACE_PATH_PREFIX=${{ matrix.api.namespace }}" >> $GITHUB_ENV
+      #     # Set the deck file namespace path prefix
+      #     echo "DECK_FILE_NAMESPACE_PATH_PREFIX=${{ matrix.api.namespace }}" >> $GITHUB_ENV
 
-          # Set the service enabled flag
-          echo "DECK_SERVICE_ENABLED=${{ matrix.api.enabled }}" >> $GITHUB_ENV
+      #     # Set the service enabled flag
+      #     echo "DECK_SERVICE_ENABLED=${{ matrix.api.enabled }}" >> $GITHUB_ENV
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -253,6 +260,11 @@ jobs:
       - name: Lint merged Kong Gateway configuration file
         run: |
           deck file lint -s ${{ env.OUTPUT_DIR }}/kong-combined.yaml ${{ env.PLATFORM_DIR }}/kong.ruleset.yaml;
+        working-directory: ${{ env.OUTPUT_DIR }}
+
+      - name: Validate merged Kong Gateway configuration file
+        run: |
+          deck file validate ${{ env.OUTPUT_DIR }}/kong-combined.yaml
         working-directory: ${{ env.OUTPUT_DIR }}
 
       - name: Debug merged Kong Gateway configuration file
