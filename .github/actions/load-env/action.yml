@@ -18,7 +18,7 @@ runs:
     - name: Source decK environment variables
       shell: bash
       run: |
-        for file in ${{ env.ENTITY_COMMON_VARS }} ${{ env.ENTITY_ENV_VARS }}; do
+        for file in ${{ env.ENTITY_COMMON_VARS }} ${{ env.ENTITY_ENV_VARS }} ${{ env.GOVERNANCE_COMMON_VARS }} ${{ env.GOVERNANCE_ENV_VARS }}; do
           if [ -f "$file" ]; then
             set -a
             echo "Sourcing $file"

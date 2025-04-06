@@ -35,6 +35,8 @@ env:
   ENTITY_COMMON_VARS: ${{ github.workspace }}/entities/${{ inputs.entity }}/env.sh
   OUTPUT_DIR: ${{ github.workspace }}/.generated
   GOVERNANCE_DIR: ${{ github.workspace }}/governance
+  GOVERNANCE_ENV_VARS: ${{ github.workspace }}/governance/environments/${{ inputs.environment }}/env.sh
+  GOVERNANCE_COMMON_VARS: ${{ github.workspace }}/governance/env.sh
 
 jobs:
   get-apis:
