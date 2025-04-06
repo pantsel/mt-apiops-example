@@ -32,9 +32,7 @@ This repository contains an example of API Operations (APIOps) implementation us
 ├── .github/                    # GitHub Actions workflows
 │   └── workflows/             # CI/CD workflow definitions
 │       └── build-deploy.yaml  # Build and deploy workflow
-├── .deck.yaml                 # Deck configuration for Kong
-├── .gitignore                 # Git ignore rules
-└── act.secrets               # Local development secrets
+└── .gitignore                 # Git ignore rules
 ```
 
 ## Prerequisites
@@ -47,28 +45,9 @@ This repository contains an example of API Operations (APIOps) implementation us
 
 The project uses the following configuration files:
 
-- `.deck.yaml`: Contains Kong Gateway configuration and authentication details
 - `platform/kong.ruleset.yaml`: Defines Kong-specific rules and policies
 - `platform/openapi.ruleset.yaml`: Contains OpenAPI validation rules
 
-## Getting Started
-
-1. Clone the repository:
-   ```bash
-   git clone <repository-url>
-   cd mt-apiops-example
-   ```
-
-2. Configure your Kong Gateway credentials in `.deck.yaml`:
-   ```yaml
-   konnect-token: your-token
-   konnect-addr: your-konnect-address
-   ```
-
-3. Apply the configuration to your Kong Gateway:
-   ```bash
-   deck sync
-   ```
 
 ## API Documentation
 
