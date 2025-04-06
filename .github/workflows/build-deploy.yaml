@@ -21,7 +21,7 @@ on:
       show-summary:
         required: false
         type: boolean
-        description: "Whether to show the summary of the build and deploy process"
+        description: "Show the summary of the build and deploy process"
         default: true
 
 env:
