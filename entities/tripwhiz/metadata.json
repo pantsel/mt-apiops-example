@@ -25,12 +25,6 @@
                     "version": "v1",
                     "enabled": true,
                     "namespace": "/tripwhiz/flights/v1"
-                },
-                {
-                    "name": "routes",
-                    "version": "v1",
-                    "enabled": false,
-                    "namespace": "/tripwhiz/routes/v1"
                 }
             ]                
         }
