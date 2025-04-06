@@ -1,0 +1,12 @@
+---
+_format_version: '3.0'
+add-plugins:
+- selectors:
+  - "$..services[0]"
+  overwrite: false
+  plugins:
+    - name: request-transformer-advanced
+      config:
+        add:
+          headers:
+            - X-Entity-Name:${{ env "DECK_ENTITY_NAME" }}

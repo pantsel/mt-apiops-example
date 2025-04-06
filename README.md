@@ -35,12 +35,6 @@ This repository contains an example of API Operations (APIOps) implementation us
 └── .gitignore                 # Git ignore rules
 ```
 
-## Prerequisites
-
-- [Kong Gateway](https://konghq.com/kong/)
-- [Deck](https://github.com/Kong/deck) - A declarative configuration tool for Kong
-- [GitHub Actions](https://github.com/features/actions) (for CI/CD)
-
 ## Configuration
 
 The project uses the following configuration files:
@@ -56,7 +50,7 @@ The project includes two main API categories:
 - **Flights API**: Handles flight-related operations
 - **Routes API**: Manages route-related operations
 
-Each API is documented using OpenAPI specifications and follows best practices for API design.
+Each API is documented using OpenAPI specifications.
 
 ## CI/CD
 

@@ -30,7 +30,8 @@ env:
   APIS_DIR: ${{ github.workspace }}/apis
   ENTITY_DIR: ${{ github.workspace }}/entities/${{ inputs.entity }}
   ENTITY_DIR_KONG: ${{ github.workspace }}/entities/${{ inputs.entity }}/kong
-  ENTITY_METADATA: ${{ github.workspace }}/entities/${{ inputs.entity }}/metadata.json
+  ENTITY_METADATA: ${{ github.workspace }}/entities/${{ inputs.entity }}/environments/${{ inputs.environment }}/metadata.json
+  ENTITY_ENV_VARS: ${{ github.workspace }}/entities/${{ inputs.entity }}/environments/${{ inputs.environment }}/env.sh
   OUTPUT_DIR: ${{ github.workspace }}/.generated
   GOVERNANCE_DIR: ${{ github.workspace }}/governance
 
@@ -44,7 +45,7 @@ jobs:
       - name: Get enabled APIs from metadata
         id: set-apis
         run: |
-          APIS=$(jq -c '[.environments[] | select(.name=="${{ inputs.environment }}") | .apis[] | . ]' $ENTITY_METADATA)
+          APIS=$(jq -c '[ .apis[] | . ]' $ENTITY_METADATA)
           echo "apis=$APIS" >> $GITHUB_OUTPUT
 
   build:
@@ -63,15 +64,16 @@ jobs:
 
       - uses: kong/setup-deck@v1
 
-      - name: Source env.${{ inputs.environment }}.sh
+      - name: Source ${{ env.ENTITY_ENV_VARS }}
         run: |
-          set -a
-          source ./env.${{ inputs.environment }}.sh
-          set +a
-
-          env | grep '^DECK_' >> "$GITHUB_ENV"
-
-        working-directory: ${{ env.ENTITY_DIR }}
+          if [ -f "${{ env.ENTITY_ENV_VARS }}" ]; then
+            set -a
+            source ${{ env.ENTITY_ENV_VARS }}
+            set +a
+            env | grep '^DECK_' >> "$GITHUB_ENV"
+          else
+            echo "Environment file ${{ env.ENTITY_ENV_VARS }} does not exist. Skipping."
+          fi
 
       - name: Setup extra decK variables
         run: |
@@ -91,6 +93,9 @@ jobs:
 
           # Set the service enabled flag
           echo "DECK_SERVICE_ENABLED=${{ matrix.api.enabled }}" >> $GITHUB_ENV
+
+          # Set the oidc issuer
+          echo "DECK_CONFIG_OIDC_ISSUER=https://auth-${{ inputs.entity }}-${{ inputs.environment }}.myidp.com/auth/realms/master/.well-known/openid-configuration" >> $GITHUB_ENV
       
       - name: Lint OpenAPI Spec
         run: |
