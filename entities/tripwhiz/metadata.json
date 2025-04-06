@@ -16,7 +16,6 @@
                     "namespace": "/tripwhiz/routes/v1"
                 }
             ]
-                
         },
         {
             "name": "production",
@@ -33,8 +32,7 @@
                     "enabled": false,
                     "namespace": "/tripwhiz/routes/v1"
                 }
-            ]
-                
+            ]                
         }
     ]
 }
