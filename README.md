@@ -138,8 +138,8 @@ graph TD
     S -->|Complete| V[End]
     U -->|Complete| V[End]
 
-    style A fill:#f9f,stroke:#333,stroke-width:2px
-    style V fill:#f9f,stroke:#333,stroke-width:2px
-    style T fill:#f66,stroke:#333,stroke-width:2px
-    style S fill:#6f6,stroke:#333,stroke-width:2px
+    style A fill:#666,stroke:#666,stroke-width:1px,color:#fff
+    style V fill:#666,stroke:#666,stroke-width:1px,color:#fff
+    style T fill:#666,stroke:#666,stroke-width:1px,color:#fff
+    style S fill:#666,stroke:#666,stroke-width:1px,color:#fff
 ```
