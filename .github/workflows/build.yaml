@@ -46,6 +46,8 @@ jobs:
     name: Build ${{ matrix.api.name }}-${{ matrix.api.version }} on ${{ inputs.entity }} ${{ inputs.environment }}
     needs: get-apis
     runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
     env:
       API_SPEC: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/openapi.yaml
       API_KONG_DIR: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/kong
