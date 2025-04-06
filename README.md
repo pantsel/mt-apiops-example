@@ -67,44 +67,47 @@ The build and deploy workflow handles the build and deployment of API configurat
 - **Jobs**:
   1. `get-apis`: Retrieves enabled APIs from entity metadata for the specified environment
   2. `build`: Matrix job that for each API:
-     - Sets up environment variables and Deck configuration
+     - Sets up environment variables using the `load-env` action
      - Lints OpenAPI specifications using governance rules
      - Converts OpenAPI specs to Kong declarative config
      - Adds API-specific plugins
      - Adds entity-level plugins and patches
-     - Applies namespace configurations
+     - Applies namespace configurations if required
      - Adds tags
      - Validates and renders Kong configurations
      - Uploads generated artifacts
   3. `combine`: Merges all API configurations:
      - Downloads all API artifacts
      - Merges configurations into a single file
-     - Applies governance patches
+     - Applies governance plugins and patches
      - Validates and lints combined configuration
-     - Shows configuration preview and diff in summary (if enabled)
+     - Shows configuration preview and diff in summary (if show-summary is enabled)
      - Uploads combined configuration
   4. `deploy`: Deploys the combined configuration:
      - Downloads combined configuration
      - Creates backup of current Kong Gateway configuration (with generated_by:apiops tag)
      - Syncs new configuration to Kong Gateway
+     - Waits for changes to propagate
      - Tests the API
      - Reverts to backup if sync or tests fail
      - Creates and uploads recent backup on success
 
 ### Environment Support
 The workflows support multiple environments:
-- Development (dev)
-- Acceptance (acc)
-- Production (prd)
+- Development (development)
+- Acceptance (acceptance)
+- Production (production)
 
 ### Security and Reliability
 - Uses GitHub Secrets for sensitive information
-- Implements environment-specific configurations
+- Implements environment-specific configurations via `load-env` action
 - Validates API specifications before deployment
 - Creates tagged backups before deployment
 - Implements automatic rollback on failure
 - Uses governance rules for validation
-- Supports configuration preview and diff review
+- Supports optional configuration preview and diff review
+- Waits for changes to propagate before testing
+- Maintains backup history with generated_by:apiops tag
 
 ### Build and Deploy Process Flow
 ```mermaid
@@ -112,7 +115,7 @@ graph TD
     A[Start] -->|Manual Trigger| B[get-apis]
     B -->|Get enabled APIs| C[build]
     C -->|Matrix Job| D[For each API]
-    D -->|1| E[Setup & Lint]
+    D -->|1| E[Setup & Load Env]
     D -->|2| F[Convert & Add Plugins]
     D -->|3| G[Add Patches & Namespace]
     D -->|4| H[Validate & Upload]
