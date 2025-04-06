@@ -127,7 +127,7 @@ graph TD
     I -->|3| L[Apply Governance]
     I -->|4| M[Validate & Upload]
     M -->|Success| N[Deploy]
-    N -->|1| O[Download Config]
+    N -->|1| O[Download Combined Config]
     N -->|2| P[Create Backup]
     N -->|3| Q[Sync to Gateway]
     Q -->|Success| R[Wait & Test]
