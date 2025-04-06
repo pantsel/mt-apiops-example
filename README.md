@@ -6,42 +6,54 @@ This repository contains an example of API Operations (APIOps) implementation us
 
 ```
 .
-├── apis/                          # API definitions and documentation
-│   ├── flights/                   # Flight-related API endpoints
-│   │   └── v1/                   # Version 1 of the Flights API
-│   │       ├── openapi.yaml      # OpenAPI specification
-│   │       └── kong/            # Kong-specific configurations
-│   │           └── plugins/     # API-specific plugins
-│   └── routes/                   # Route-related API endpoints
-│       └── v1/                   # Version 1 of the Routes API
-│           ├── openapi.yaml      # OpenAPI specification
-│           └── kong/            # Kong-specific configurations
-│               └── plugins/     # API-specific plugins
-├── entities/                     # Entity definitions
-│   └── tripwhiz/                # TripWhiz entity configuration
-│       ├── metadata.json        # Entity metadata
-│       ├── kong/               # Entity-specific Kong configurations
-│       │   ├── plugins/       # Entity-level plugins
-│       │   └── patches/       # Entity-level patches
-│       └── env.*.sh           # Environment-specific configurations
-├── governance/                    # Governance configuration
-│   ├── kong/                   # Kong Gateway configuration
-│   │   └── patches/           # Governance patches
-│   ├── kong.ruleset.yaml      # Kong configuration specific rules
-│   └── openapi.ruleset.yaml   # OpenAPI validation rules
-├── .github/                    # GitHub Actions workflows
-│   └── workflows/             # CI/CD workflow definitions
-│       └── build-deploy.yaml  # Build and deploy workflow
-└── .gitignore                 # Git ignore rules
+├── .github/                           # GitHub Actions workflows and custom actions
+│   ├── actions/                       # Custom GitHub Actions
+│   │   └── load-env/                  # Environment loading action
+│   └── workflows/                     # CI/CD workflow definitions
+│       └── build-deploy.yaml          # Build and deploy workflow
+├── apis/                              # API definitions and documentation
+│   ├── flights/                       # Flight-related API endpoints
+│   │   └── v1/                        # Version 1 of the Flights API
+│   │       ├── openapi.yaml           # OpenAPI specification
+│   │       └── kong/                  # Kong-specific configurations
+│   │           └── plugins/           # API-specific plugins
+│   └── routes/                        # Route-related API endpoints
+│       └── v1/                        # Version 1 of the Routes API
+│           ├── openapi.yaml           # OpenAPI specification
+│           └── kong/                  # Kong-specific configurations
+│               └── plugins/           # API-specific plugins
+├── entities/                          # Entity definitions
+│   └── tripwhiz/                      # TripWhiz entity configuration
+│       ├── environments/              # Environment-specific configurations
+│       │   ├── development/           # Development environment
+│       │   ├── acceptance/            # Acceptance environment
+│       │   └── production/            # Production environment
+│       │       ├── env.sh             # Entity environment specific variables
+│       │       └── metadata.json      # Entity metadata
+│       ├── kong/                      # Entity-specific Kong configurations
+│       │   ├── plugins/               # Entity-level plugins
+│       │   └── patches/               # Entity-level patches
+│       ├── env.sh                     # Common environment variables
+│       └── metadata.json              # Entity metadata
+├── governance/                        # Governance configuration
+│   ├── kong/                          # Kong Gateway configuration
+│   │   ├── plugins/                   # Governance-level plugins
+│   │   └── patches/                   # Governance-level patches
+│   ├── kong.ruleset.yaml              # Kong configuration specific rules
+│   └── openapi.ruleset.yaml           # OpenAPI validation rules
+├── .generated/                        # Placeholder for generated configuration files in the CI/CD pipeline
+└── .gitignore                         # Git ignore rules
 ```
 
 ## Configuration
 
 The project uses the following configuration files:
 
-- `platform/kong.ruleset.yaml`: Defines Kong-specific rules and policies
-- `platform/openapi.ruleset.yaml`: Contains OpenAPI validation rules
-
+- `governance/kong.ruleset.yaml`: Defines Kong-specific rules and policies
+- `governance/openapi.ruleset.yaml`: Contains OpenAPI validation rules
+- `.deck.yaml`: Deck configuration for Kong Gateway
+- `act.secrets`: Secrets for local development with Act
+- `.actrc`: Act configuration for local development
 
 ## API Documentation
 
