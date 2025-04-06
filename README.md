@@ -24,10 +24,10 @@ This repository contains an example of API Operations (APIOps) implementation us
 │       │   ├── plugins/       # Entity-level plugins
 │       │   └── patches/       # Entity-level patches
 │       └── env.*.sh           # Environment-specific configurations
-├── platform/                    # Platform configuration
+├── governance/                    # Governance configuration
 │   ├── kong/                   # Kong Gateway configuration
-│   │   └── patches/           # Platform-level patches
-│   ├── kong.ruleset.yaml      # Kong-specific rules
+│   │   └── patches/           # Governance patches
+│   ├── kong.ruleset.yaml      # Kong configuration specific rules
 │   └── openapi.ruleset.yaml   # OpenAPI validation rules
 ├── .github/                    # GitHub Actions workflows
 │   └── workflows/             # CI/CD workflow definitions
