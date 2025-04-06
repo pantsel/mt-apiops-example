@@ -115,13 +115,13 @@ The workflows support multiple environments:
 ```mermaid
 graph TD
     A[Start] -->|Manual Trigger| B[get-apis]
-    B -->|Get enabled APIs| C[build]
+    B -->|Get enabled APIs| C[build<br>API & Entity level Configs]
     C -->|Matrix Job| D[For each API]
     D -->|1| E[Setup & Load Env]
     D -->|2| F[Convert & Add Plugins]
     D -->|3| G[Add Patches & Namespace]
     D -->|4| H[Validate & Upload]
-    H -->|All APIs| I[combine]
+    H -->|All APIs| I[combine<br>Governance level Configs]
     I -->|1| J[Download Artifacts]
     I -->|2| K[Merge Configs]
     I -->|3| L[Apply Governance]
