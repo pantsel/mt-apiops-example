@@ -6,16 +6,35 @@ This repository contains an example of API Operations (APIOps) implementation us
 
 ```
 .
-├── apis/                    # API definitions and documentation
-│   ├── flights/            # Flight-related API endpoints
-│   └── routes/             # Route-related API endpoints
-├── entities/               # Entity definitions
-├── platform/               # Platform configuration
-│   ├── kong/              # Kong Gateway configuration
-│   ├── kong.ruleset.yaml  # Kong-specific rules
-│   └── openapi.ruleset.yaml # OpenAPI validation rules
-├── .github/               # GitHub Actions workflows
-└── .deck.yaml            # Deck configuration for Kong
+├── apis/                          # API definitions and documentation
+│   ├── flights/                   # Flight-related API endpoints
+│   │   └── v1/                   # Version 1 of the Flights API
+│   │       ├── openapi.yaml      # OpenAPI specification
+│   │       └── kong/            # Kong-specific configurations
+│   │           └── plugins/     # API-specific plugins
+│   └── routes/                   # Route-related API endpoints
+│       └── v1/                   # Version 1 of the Routes API
+│           ├── openapi.yaml      # OpenAPI specification
+│           └── kong/            # Kong-specific configurations
+│               └── plugins/     # API-specific plugins
+├── entities/                     # Entity definitions
+│   └── tripwhiz/                # TripWhiz entity configuration
+│       ├── metadata.json        # Entity metadata
+│       ├── kong/               # Entity-specific Kong configurations
+│       │   ├── plugins/       # Entity-level plugins
+│       │   └── patches/       # Entity-level patches
+│       └── env.*.sh           # Environment-specific configurations
+├── platform/                    # Platform configuration
+│   ├── kong/                   # Kong Gateway configuration
+│   │   └── patches/           # Platform-level patches
+│   ├── kong.ruleset.yaml      # Kong-specific rules
+│   └── openapi.ruleset.yaml   # OpenAPI validation rules
+├── .github/                    # GitHub Actions workflows
+│   └── workflows/             # CI/CD workflow definitions
+│       └── build-deploy.yaml  # Build and deploy workflow
+├── .deck.yaml                 # Deck configuration for Kong
+├── .gitignore                 # Git ignore rules
+└── act.secrets               # Local development secrets
 ```
 
 ## Prerequisites
