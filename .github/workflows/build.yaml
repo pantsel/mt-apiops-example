@@ -95,13 +95,13 @@ jobs:
 
       - name: Convert OpenAPI Spec to Kong declarative config
         run: |
-          cat ${{ env.API_SPEC }} | deck file openapi2kong --generate-security -o $OUTPUT_DIR/kong.yaml
+          cat ${{ env.API_SPEC }} | deck file openapi2kong --generate-security -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
 
       - name: Add plugins (API)
         run: |
           # if ./plugins exists, and has at least one file .yaml file, apply the plugins
           if [ -d "./plugins" ] && [ "$(ls -A ./plugins/*.yaml 2>/dev/null)" ]; then
-            cat $OUTPUT_DIR/kong.yaml | deck file add-plugins ./plugins/*.yaml -o $OUTPUT_DIR/kong.yaml
+            cat $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml | deck file add-plugins ./plugins/*.yaml -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
           else
             echo "No API level plugins found for ${{ matrix.api.name }}/${{ matrix.api.version }}"
           fi
@@ -111,7 +111,7 @@ jobs:
         run: |
           # if ./plugins exists, and has at least one file .yaml file, apply the plugins
           if [ -d "./plugins" ] && [ "$(ls -A ./plugins/*.yaml 2>/dev/null)" ]; then
-            cat $OUTPUT_DIR/kong.yaml | deck file add-plugins ./plugins/*.yaml -o $OUTPUT_DIR/kong.yaml
+            cat $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml | deck file add-plugins ./plugins/*.yaml -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
           else
             echo "No Entity level plugins found for ${{ inputs.entity }}"
           fi
@@ -121,7 +121,7 @@ jobs:
         run: |
           # if ./patches exists, and has at least one file .yaml file, apply the patches
           if [ -d "./patches" ] && [ "$(ls -A ./patches/*.yaml 2>/dev/null)" ]; then
-            cat $OUTPUT_DIR/kong.yaml | deck file patch ./patches/*.yaml -o $OUTPUT_DIR/kong.yaml
+            cat $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml | deck file patch ./patches/*.yaml -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
           else
             echo "No Entity level patches found for ${{ inputs.entity }}"
           fi
@@ -129,7 +129,7 @@ jobs:
 
       - name: Add Tags
         run: |
-          cat $OUTPUT_DIR/kong.yaml | deck file add-tags $DECK_API_NAME $DECK_API_VERSION apiops -o $OUTPUT_DIR/kong.yaml
+          cat $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml | deck file add-tags $DECK_API_NAME $DECK_API_VERSION -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
         working-directory: ${{ env.ENTITY_KONG_DIR }}
 
       - name: Add namespace if required
@@ -142,7 +142,7 @@ jobs:
           if [ -n "$DECK_FILE_NAMESPACE_HOST" ]; then
             cmd="$cmd --host=$DECK_FILE_NAMESPACE_HOST"
           fi
-            cat kong.yaml | $cmd -o kong.yaml
+            cat $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml | $cmd -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
           else
             echo "Skipping namespace step as both path-prefix and host are empty."
           fi
@@ -150,53 +150,48 @@ jobs:
 
       - name: Lint Kong Gateway configuration file
         run: |
-          deck file lint -s kong.yaml ${{ env.PLATFORM_DIR }}/kong.ruleset.yaml;
+          deck file lint -s $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml ${{ env.PLATFORM_DIR }}/kong.ruleset.yaml;
         working-directory: ${{ env.OUTPUT_DIR }}
 
       - name: Debug Kong declarative config
         run: |
-          cat $OUTPUT_DIR/kong.yaml
+          cat $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
 
       - name: Validate Generated Kong Gateway configuration
-        run: deck file validate kong.yaml
+        run: deck file validate $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
         working-directory: ${{ env.OUTPUT_DIR }}
 
       - name: Diff Kong Gateway configuration
         run: |
-          deck gateway diff kong.yaml  \
+          deck gateway diff $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml  \
             --konnect-addr="${{ env.KONNECT_API_URL }}" \
             --konnect-token="${{ secrets.KONNECT_TOKEN }}" \
             --konnect-control-plane-name="${{ env.KONNECT_CONTROL_PLANE_NAME }}" > deck_diff.txt
         working-directory: ${{ env.OUTPUT_DIR }}
 
+      - name: Render Kong Gateway configuration
+        run: |
+          deck file render --populate-env-vars $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml \
+            -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
+        working-directory: ${{ env.OUTPUT_DIR }}
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: artifacts-${{ matrix.api.name }}-${{ matrix.api.version }}-${{ inputs.environment }}
+          name: artifacts-${{ inputs.entity }}-${{ inputs.environment }}-${{ matrix.api.name }}-${{ matrix.api.version }}
           path: |
-            ${{ env.OUTPUT_DIR }}/kong.yaml
-
+            ${{ env.OUTPUT_DIR }}/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
+  
   deploy:
-    name: Deploy ${{ matrix.api.name }}-${{ matrix.api.version }} on ${{ inputs.entity }} ${{ inputs.environment }}
+    name: Deploy on ${{ inputs.entity }} ${{ inputs.environment }}
     needs:
       - get-apis
       - build
     runs-on: ubuntu-latest
     environment:
       name: ${{ inputs.environment }}
-    env:
-      API_SPEC: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/openapi.yaml
-      API_KONG_DIR: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/kong
-    strategy:
-      matrix:
-        api: ${{ fromJson(needs.get-apis.outputs.apis) }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: artifacts-${{ matrix.api.name }}-${{ matrix.api.version }}-${{ inputs.environment }}
 
       - uses: kong/setup-deck@v1
 
@@ -228,6 +223,41 @@ jobs:
 
           # Set the service enabled flag
           echo "DECK_SERVICE_ENABLED=${{ matrix.api.enabled }}" >> $GITHUB_ENV
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: artifacts-${{ inputs.entity }}-${{ inputs.environment }}-*
+          path: ./downloaded
+
+      - name: Debug downloaded artifacts
+        run: |
+          ls -la ./downloaded
+
+      - name: Merge all artifacts into a single folder
+        run: |
+          mkdir merged-artifacts
+          find ./downloaded -type f -exec cp {} merged-artifacts/ \;
+
+      - name: List merged files
+        run: ls -R merged-artifacts
+
+      - name: Merge all artifacts into a single file
+        run: |
+          deck file merge merged-artifacts/*-kong.yaml -o ${{ env.OUTPUT_DIR }}/kong-combined.yaml
+
+      - name: Apply governance patches
+        run: |
+          cat  ${{ env.OUTPUT_DIR }}/kong-combined.yaml | deck file patch ${{ env.OUTPUT_DIR }}/kong-combined.yaml ${{ env.PLATFORM_DIR }}/kong/patches/*.yaml -o ${{ env.OUTPUT_DIR }}/kong-combined.yaml
+
+      - name: Lint merged Kong Gateway configuration file
+        run: |
+          deck file lint -s ${{ env.OUTPUT_DIR }}/kong-combined.yaml ${{ env.PLATFORM_DIR }}/kong.ruleset.yaml;
+        working-directory: ${{ env.OUTPUT_DIR }}
+
+      - name: Debug merged Kong Gateway configuration file
+        run: |
+          cat ${{ env.OUTPUT_DIR }}/kong-combined.yaml
       
       - name: Get a backup of the previous Kong Gateway configuration
         run: |
@@ -238,7 +268,75 @@ jobs:
 
       - name: Sync Kong Gateway configuration
         run: |
-          deck gateway sync kong.yaml  \
+          deck gateway sync ${{ env.OUTPUT_DIR }}/kong-combined.yaml  \
+            --no-mask-deck-env-vars-value \
             --konnect-addr="${{ env.KONNECT_API_URL }}" \
             --konnect-token="${{ secrets.KONNECT_TOKEN }}" \
             --konnect-control-plane-name="${{ env.KONNECT_CONTROL_PLANE_NAME }}"
+
+  # deploy:
+  #   name: Deploy ${{ matrix.api.name }}-${{ matrix.api.version }} on ${{ inputs.entity }} ${{ inputs.environment }}
+  #   needs:
+  #     - get-apis
+  #     - build
+  #   runs-on: ubuntu-latest
+  #   environment:
+  #     name: ${{ inputs.environment }}
+  #   env:
+  #     API_SPEC: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/openapi.yaml
+  #     API_KONG_DIR: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/kong
+  #   strategy:
+  #     matrix:
+  #       api: ${{ fromJson(needs.get-apis.outputs.apis) }}
+  #   steps:
+  #     - uses: actions/checkout@v4
+
+  #     - name: Download artifacts
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: artifacts-${{ matrix.api.name }}-${{ matrix.api.version }}-${{ inputs.environment }}
+
+  #     - uses: kong/setup-deck@v1
+
+  #     - name: Source env.${{ inputs.environment }}.sh
+  #       run: |
+  #         set -a
+  #         source ./env.${{ inputs.environment }}.sh
+  #         set +a
+
+  #         env | grep '^DECK_' >> "$GITHUB_ENV"
+
+  #       working-directory: ${{ env.ENTITY_DIR }}
+
+  #     - name: Setup extra decK variables
+  #       run: |
+
+  #         # Set the API URL
+  #         api_url="https://${{ inputs.entity }}-${{ inputs.environment }}.${{ matrix.api.name }}.svc.cluster.local:8000"
+  #         echo "DECK_API_URL=$api_url" >> $GITHUB_ENV
+
+  #         # Set the API Name
+  #         echo "DECK_API_NAME=${{ matrix.api.name }}" >> $GITHUB_ENV
+
+  #         # Set the API Version
+  #         echo "DECK_API_VERSION=${{ matrix.api.version }}" >> $GITHUB_ENV
+
+  #         # Set the deck file namespace path prefix
+  #         echo "DECK_FILE_NAMESPACE_PATH_PREFIX=${{ matrix.api.namespace }}" >> $GITHUB_ENV
+
+  #         # Set the service enabled flag
+  #         echo "DECK_SERVICE_ENABLED=${{ matrix.api.enabled }}" >> $GITHUB_ENV
+      
+  #     - name: Get a backup of the previous Kong Gateway configuration
+  #       run: |
+  #         deck gateway dump \
+  #           --konnect-addr="${{ env.KONNECT_API_URL }}" \
+  #           --konnect-token="${{ secrets.KONNECT_TOKEN }}" \
+  #           --konnect-control-plane-name="${{ env.KONNECT_CONTROL_PLANE_NAME }}" -o kong_backup.yaml
+
+  #     - name: Sync Kong Gateway configuration
+  #       run: |
+  #         deck gateway sync kong.yaml  \
+  #           --konnect-addr="${{ env.KONNECT_API_URL }}" \
+  #           --konnect-token="${{ secrets.KONNECT_TOKEN }}" \
+  #           --konnect-control-plane-name="${{ env.KONNECT_CONTROL_PLANE_NAME }}"
