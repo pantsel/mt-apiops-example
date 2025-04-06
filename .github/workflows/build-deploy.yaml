@@ -158,7 +158,7 @@ jobs:
 
       - name: Show config in summary
         run: |
-            echo "### 🔧 Config Preview" >> $GITHUB_STEP_SUMMARY
+            echo "### 🔧 Config Preview - ${{ matrix.api.name }}-${{ matrix.api.version }}" >> $GITHUB_STEP_SUMMARY
             echo '```yaml' >> $GITHUB_STEP_SUMMARY
             cat $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
@@ -209,6 +209,13 @@ jobs:
         run: |
           deck file validate ${{ env.OUTPUT_DIR }}/kong-combined.yaml
         working-directory: ${{ env.OUTPUT_DIR }}
+
+      - name: Show combined config in summary
+        run: |
+            echo "### 🔧 Combined config Preview" >> $GITHUB_STEP_SUMMARY
+            echo '```yaml' >> $GITHUB_STEP_SUMMARY
+            cat ${{ env.OUTPUT_DIR }}/kong-combined.yaml >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Show diff in summary
         run: |
