@@ -6,6 +6,7 @@ add-plugins:
   overwrite: false
   plugins:
     - name: request-transformer-advanced
+      enabled: true
       config:
         add:
           headers:

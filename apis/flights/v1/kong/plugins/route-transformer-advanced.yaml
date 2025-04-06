@@ -6,5 +6,7 @@ add-plugins:
   overwrite: false
   plugins:
     - name: route-transformer-advanced
+      enabled: true
+      instance_name: "update-flights-hc-port"
       config:
         port: "5432"
