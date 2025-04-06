@@ -32,6 +32,7 @@ env:
   ENTITY_DIR_KONG: ${{ github.workspace }}/entities/${{ inputs.entity }}/kong
   ENTITY_METADATA: ${{ github.workspace }}/entities/${{ inputs.entity }}/environments/${{ inputs.environment }}/metadata.json
   ENTITY_ENV_VARS: ${{ github.workspace }}/entities/${{ inputs.entity }}/environments/${{ inputs.environment }}/env.sh
+  ENTITY_COMMON_VARS: ${{ github.workspace }}/entities/${{ inputs.entity }}/env.sh
   OUTPUT_DIR: ${{ github.workspace }}/.generated
   GOVERNANCE_DIR: ${{ github.workspace }}/governance
 
@@ -64,16 +65,20 @@ jobs:
 
       - uses: kong/setup-deck@v1
 
-      - name: Source ${{ env.ENTITY_ENV_VARS }}
+      - name: Source decK environment variables
         run: |
-          if [ -f "${{ env.ENTITY_ENV_VARS }}" ]; then
-            set -a
-            source ${{ env.ENTITY_ENV_VARS }}
-            set +a
-            env | grep '^DECK_' >> "$GITHUB_ENV"
-          else
-            echo "Environment file ${{ env.ENTITY_ENV_VARS }} does not exist. Skipping."
-          fi
+
+          for file in ${{ env.ENTITY_COMMON_VARS }} ${{ env.ENTITY_ENV_VARS }}; do
+            if [ -f "$file" ]; then
+              set -a
+              echo "Sourcing $file"
+              source $file
+              set +a
+              env | grep '^DECK_' >> "$GITHUB_ENV"
+            else
+              echo "No environment file found for $file. Skipping."
+            fi
+          done
 
       - name: Setup extra decK variables
         run: |
@@ -184,6 +189,43 @@ jobs:
 
       - uses: kong/setup-deck@v1
 
+      - name: Source decK environment variables
+        run: |
+
+          for file in ${{ env.ENTITY_COMMON_VARS }} ${{ env.ENTITY_ENV_VARS }}; do
+            if [ -f "$file" ]; then
+              set -a
+              echo "Sourcing $file"
+              source $file
+              set +a
+              env | grep '^DECK_' >> "$GITHUB_ENV"
+            else
+              echo "No environment file found for $file. Skipping."
+            fi
+          done
+
+      - name: Setup extra decK variables
+        run: |
+
+          # Set the API URL
+          api_url="https://${{ inputs.entity }}-${{ inputs.environment }}.${{ matrix.api.name }}.svc.cluster.local:8000"
+          echo "DECK_API_URL=$api_url" >> $GITHUB_ENV
+
+          # Set the API Name
+          echo "DECK_API_NAME=${{ matrix.api.name }}" >> $GITHUB_ENV
+
+          # Set the API Version
+          echo "DECK_API_VERSION=${{ matrix.api.version }}" >> $GITHUB_ENV
+
+          # Set the deck file namespace path prefix
+          echo "DECK_FILE_NAMESPACE_PATH_PREFIX=${{ matrix.api.namespace }}" >> $GITHUB_ENV
+
+          # Set the service enabled flag
+          echo "DECK_SERVICE_ENABLED=${{ matrix.api.enabled }}" >> $GITHUB_ENV
+
+          # Set the oidc issuer
+          echo "DECK_CONFIG_OIDC_ISSUER=https://auth-${{ inputs.entity }}-${{ inputs.environment }}.myidp.com/auth/realms/master/.well-known/openid-configuration" >> $GITHUB_ENV
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
@@ -199,6 +241,10 @@ jobs:
         run: |
           deck file merge merged-artifacts/*-kong.yaml -o ${{ env.OUTPUT_DIR }}/kong-combined.yaml
 
+      - name: Apply governance plugins
+        run: |
+          cat  ${{ env.OUTPUT_DIR }}/kong-combined.yaml | deck file add-plugins ${{ env.GOVERNANCE_DIR }}/kong/plugins/*.yaml -o ${{ env.OUTPUT_DIR }}/kong-combined.yaml
+
       - name: Apply governance patches
         run: |
           cat  ${{ env.OUTPUT_DIR }}/kong-combined.yaml | deck file patch ${{ env.GOVERNANCE_DIR }}/kong/patches/*.yaml -o ${{ env.OUTPUT_DIR }}/kong-combined.yaml
@@ -212,6 +258,10 @@ jobs:
         run: |
           deck file validate ${{ env.OUTPUT_DIR }}/kong-combined.yaml
         working-directory: ${{ env.OUTPUT_DIR }}
+
+      - name: Debug
+        run: |
+          cat ${{ env.OUTPUT_DIR }}/kong-combined.yaml
 
       - name: Show combined config in summary
         if: ${{ inputs.show-summary }}
@@ -253,6 +303,43 @@ jobs:
         with:
           name: kong-combined
           path: ${{ env.OUTPUT_DIR }}/kong-combined.yaml
+
+      - name: Source decK environment variables
+        run: |
+
+          for file in ${{ env.ENTITY_COMMON_VARS }} ${{ env.ENTITY_ENV_VARS }}; do
+            if [ -f "$file" ]; then
+              set -a
+              echo "Sourcing $file"
+              source $file
+              set +a
+              env | grep '^DECK_' >> "$GITHUB_ENV"
+            else
+              echo "No environment file found for $file. Skipping."
+            fi
+          done
+
+      - name: Setup extra decK variables
+        run: |
+
+          # Set the API URL
+          api_url="https://${{ inputs.entity }}-${{ inputs.environment }}.${{ matrix.api.name }}.svc.cluster.local:8000"
+          echo "DECK_API_URL=$api_url" >> $GITHUB_ENV
+
+          # Set the API Name
+          echo "DECK_API_NAME=${{ matrix.api.name }}" >> $GITHUB_ENV
+
+          # Set the API Version
+          echo "DECK_API_VERSION=${{ matrix.api.version }}" >> $GITHUB_ENV
+
+          # Set the deck file namespace path prefix
+          echo "DECK_FILE_NAMESPACE_PATH_PREFIX=${{ matrix.api.namespace }}" >> $GITHUB_ENV
+
+          # Set the service enabled flag
+          echo "DECK_SERVICE_ENABLED=${{ matrix.api.enabled }}" >> $GITHUB_ENV
+
+          # Set the oidc issuer
+          echo "DECK_CONFIG_OIDC_ISSUER=https://auth-${{ inputs.entity }}-${{ inputs.environment }}.myidp.com/auth/realms/master/.well-known/openid-configuration" >> $GITHUB_ENV
 
       - name: Get a backup of the previous Kong Gateway configuration
         run: |

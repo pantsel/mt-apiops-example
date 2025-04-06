@@ -2,3 +2,4 @@
 # Variables should be prefixed with DECK_
 
 export DECK_ENTITY_NAME="tripwhiz-production"
+export DECK_CONFIG_OTEL_SERVICE_NAME="kong-dp-tripwhiz-production"
