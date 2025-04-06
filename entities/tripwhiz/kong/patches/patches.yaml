@@ -12,7 +12,3 @@ patches:
     - port
     - path
     - protocol
-- selectors:
-  - "$..services[0].plugins[?(@.name == 'openid-connect')].config"
-  values:
-    issuer: ${{ env "DECK_CONFIG_OIDC_ISSUER"}}
