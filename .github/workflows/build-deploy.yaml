@@ -65,43 +65,18 @@ jobs:
 
       - uses: kong/setup-deck@v1
 
-      - name: Source decK environment variables
-        run: |
+      - name: Load environment variables
+        uses: ./.github/actions/load-env
+        with:
+          entity-common-vars: ${{ env.ENTITY_COMMON_VARS }}
+          entity-env-vars: ${{ env.ENTITY_ENV_VARS }}
+          entity: ${{ inputs.entity }}
+          environment: ${{ inputs.environment }}
+          api-name: ${{ matrix.api.name }}
+          api-namespace: ${{ matrix.api.namespace }}
+          api-enabled: ${{ matrix.api.enabled }}
+          api-version: ${{ matrix.api.version }}
 
-          for file in ${{ env.ENTITY_COMMON_VARS }} ${{ env.ENTITY_ENV_VARS }}; do
-            if [ -f "$file" ]; then
-              set -a
-              echo "Sourcing $file"
-              source $file
-              set +a
-              env | grep '^DECK_' >> "$GITHUB_ENV"
-            else
-              echo "No environment file found for $file. Skipping."
-            fi
-          done
-
-      - name: Setup extra decK variables
-        run: |
-
-          # Set the API URL
-          api_url="https://${{ inputs.entity }}-${{ inputs.environment }}.${{ matrix.api.name }}.svc.cluster.local:8000"
-          echo "DECK_API_URL=$api_url" >> $GITHUB_ENV
-
-          # Set the API Name
-          echo "DECK_API_NAME=${{ matrix.api.name }}" >> $GITHUB_ENV
-
-          # Set the API Version
-          echo "DECK_API_VERSION=${{ matrix.api.version }}" >> $GITHUB_ENV
-
-          # Set the deck file namespace path prefix
-          echo "DECK_FILE_NAMESPACE_PATH_PREFIX=${{ matrix.api.namespace }}" >> $GITHUB_ENV
-
-          # Set the service enabled flag
-          echo "DECK_SERVICE_ENABLED=${{ matrix.api.enabled }}" >> $GITHUB_ENV
-
-          # Set the oidc issuer
-          echo "DECK_CONFIG_OIDC_ISSUER=https://auth-${{ inputs.entity }}-${{ inputs.environment }}.myidp.com/auth/realms/master/.well-known/openid-configuration" >> $GITHUB_ENV
-      
       - name: Lint OpenAPI Spec
         run: |
           deck file lint -s $API_SPEC $GOVERNANCE_DIR/openapi.ruleset.yaml
@@ -189,42 +164,17 @@ jobs:
 
       - uses: kong/setup-deck@v1
 
-      - name: Source decK environment variables
-        run: |
-
-          for file in ${{ env.ENTITY_COMMON_VARS }} ${{ env.ENTITY_ENV_VARS }}; do
-            if [ -f "$file" ]; then
-              set -a
-              echo "Sourcing $file"
-              source $file
-              set +a
-              env | grep '^DECK_' >> "$GITHUB_ENV"
-            else
-              echo "No environment file found for $file. Skipping."
-            fi
-          done
-
-      - name: Setup extra decK variables
-        run: |
-
-          # Set the API URL
-          api_url="https://${{ inputs.entity }}-${{ inputs.environment }}.${{ matrix.api.name }}.svc.cluster.local:8000"
-          echo "DECK_API_URL=$api_url" >> $GITHUB_ENV
-
-          # Set the API Name
-          echo "DECK_API_NAME=${{ matrix.api.name }}" >> $GITHUB_ENV
-
-          # Set the API Version
-          echo "DECK_API_VERSION=${{ matrix.api.version }}" >> $GITHUB_ENV
-
-          # Set the deck file namespace path prefix
-          echo "DECK_FILE_NAMESPACE_PATH_PREFIX=${{ matrix.api.namespace }}" >> $GITHUB_ENV
-
-          # Set the service enabled flag
-          echo "DECK_SERVICE_ENABLED=${{ matrix.api.enabled }}" >> $GITHUB_ENV
-
-          # Set the oidc issuer
-          echo "DECK_CONFIG_OIDC_ISSUER=https://auth-${{ inputs.entity }}-${{ inputs.environment }}.myidp.com/auth/realms/master/.well-known/openid-configuration" >> $GITHUB_ENV
+      - name: Load environment variables
+        uses: ./.github/actions/load-env
+        with:
+          entity-common-vars: ${{ env.ENTITY_COMMON_VARS }}
+          entity-env-vars: ${{ env.ENTITY_ENV_VARS }}
+          entity: ${{ inputs.entity }}
+          environment: ${{ inputs.environment }}
+          api-name: ${{ matrix.api.name }}
+          api-namespace: ${{ matrix.api.namespace }}
+          api-enabled: ${{ matrix.api.enabled }}
+          api-version: ${{ matrix.api.version }}
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -298,48 +248,23 @@ jobs:
 
       - uses: kong/setup-deck@v1
 
+      - name: Load environment variables
+        uses: ./.github/actions/load-env
+        with:
+          entity-common-vars: ${{ env.ENTITY_COMMON_VARS }}
+          entity-env-vars: ${{ env.ENTITY_ENV_VARS }}
+          entity: ${{ inputs.entity }}
+          environment: ${{ inputs.environment }}
+          api-name: ${{ matrix.api.name }}
+          api-namespace: ${{ matrix.api.namespace }}
+          api-enabled: ${{ matrix.api.enabled }}
+          api-version: ${{ matrix.api.version }}
+
       - name: Download combined Kong Gateway configuration
         uses: actions/download-artifact@v4
         with:
           name: kong-combined
           path: ${{ env.OUTPUT_DIR }}/kong-combined.yaml
-
-      - name: Source decK environment variables
-        run: |
-
-          for file in ${{ env.ENTITY_COMMON_VARS }} ${{ env.ENTITY_ENV_VARS }}; do
-            if [ -f "$file" ]; then
-              set -a
-              echo "Sourcing $file"
-              source $file
-              set +a
-              env | grep '^DECK_' >> "$GITHUB_ENV"
-            else
-              echo "No environment file found for $file. Skipping."
-            fi
-          done
-
-      - name: Setup extra decK variables
-        run: |
-
-          # Set the API URL
-          api_url="https://${{ inputs.entity }}-${{ inputs.environment }}.${{ matrix.api.name }}.svc.cluster.local:8000"
-          echo "DECK_API_URL=$api_url" >> $GITHUB_ENV
-
-          # Set the API Name
-          echo "DECK_API_NAME=${{ matrix.api.name }}" >> $GITHUB_ENV
-
-          # Set the API Version
-          echo "DECK_API_VERSION=${{ matrix.api.version }}" >> $GITHUB_ENV
-
-          # Set the deck file namespace path prefix
-          echo "DECK_FILE_NAMESPACE_PATH_PREFIX=${{ matrix.api.namespace }}" >> $GITHUB_ENV
-
-          # Set the service enabled flag
-          echo "DECK_SERVICE_ENABLED=${{ matrix.api.enabled }}" >> $GITHUB_ENV
-
-          # Set the oidc issuer
-          echo "DECK_CONFIG_OIDC_ISSUER=https://auth-${{ inputs.entity }}-${{ inputs.environment }}.myidp.com/auth/realms/master/.well-known/openid-configuration" >> $GITHUB_ENV
 
       - name: Get a backup of the previous Kong Gateway configuration
         run: |

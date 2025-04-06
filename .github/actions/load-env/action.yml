@@ -1,0 +1,65 @@
+name: 'Load Environment Variables'
+description: 'Loads environment variables from entity and environment specific files'
+
+inputs:
+  entity-common-vars:
+    description: 'Path to entity common variables file'
+    required: true
+  entity-env-vars:
+    description: 'Path to entity environment variables file'
+    required: true
+  entity:
+    description: 'The entity name'
+    required: true
+  environment:
+    description: 'The environment name'
+    required: true
+  api-name:
+    description: 'The API name'
+    required: true
+  api-namespace:
+    description: 'The API namespace'
+    required: true
+  api-enabled:
+    description: 'Whether the API is enabled'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Source decK environment variables
+      shell: bash
+      run: |
+        for file in ${{ inputs.entity-common-vars }} ${{ inputs.entity-env-vars }}; do
+          if [ -f "$file" ]; then
+            set -a
+            echo "Sourcing $file"
+            source $file
+            set +a
+            env | grep '^DECK_' >> "$GITHUB_ENV"
+          else
+            echo "No environment file found for $file. Skipping."
+          fi
+        done
+
+    - name: Setup extra decK variables
+      shell: bash
+      run: |
+        # Set the API URL
+        api_url="https://${{ inputs.entity }}-${{ inputs.environment }}.${{ inputs.api-name }}.svc.cluster.local:8000"
+        echo "DECK_API_URL=$api_url" >> $GITHUB_ENV
+
+        # Set the API Name
+        echo "DECK_API_NAME=${{ inputs.api-name }}" >> $GITHUB_ENV
+
+        # Set the API Version
+        echo "DECK_API_VERSION=${{ inputs.api-version }}" >> $GITHUB_ENV
+
+        # Set the deck file namespace path prefix
+        echo "DECK_FILE_NAMESPACE_PATH_PREFIX=${{ inputs.api-namespace }}" >> $GITHUB_ENV
+
+        # Set the service enabled flag
+        echo "DECK_SERVICE_ENABLED=${{ inputs.api-enabled }}" >> $GITHUB_ENV
+
+        # Set the oidc issuer
+        echo "DECK_CONFIG_OIDC_ISSUER=https://auth-${{ inputs.entity }}-${{ inputs.environment }}.myidp.com/auth/realms/master/.well-known/openid-configuration" >> $GITHUB_ENV 
