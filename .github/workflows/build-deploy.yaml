@@ -24,10 +24,10 @@ env:
   KONNECT_CONTROL_PLANE_NAME: ${{ inputs.entity }}-${{ inputs.environment }}
   APIS_DIR: ${{ github.workspace }}/apis
   ENTITY_DIR: ${{ github.workspace }}/entities/${{ inputs.entity }}
+  ENTITY_DIR_KONG: ${{ github.workspace }}/entities/${{ inputs.entity }}/kong
   ENTITY_METADATA: ${{ github.workspace }}/entities/${{ inputs.entity }}/metadata.json
-  ENTITY_KONG_DIR: ${{ github.workspace }}/entities/${{ inputs.entity }}/kong
   OUTPUT_DIR: ${{ github.workspace }}/.generated
-  PLATFORM_DIR: ${{ github.workspace }}/platform
+  GOVERNANCE_DIR: ${{ github.workspace }}/governance
 
 jobs:
   get-apis:
@@ -89,7 +89,7 @@ jobs:
       
       - name: Lint OpenAPI Spec
         run: |
-          deck file lint -s $API_SPEC $PLATFORM_DIR/openapi.ruleset.yaml
+          deck file lint -s $API_SPEC $GOVERNANCE_DIR/openapi.ruleset.yaml
 
       - name: Convert OpenAPI Spec to Kong declarative config
         run: |
@@ -113,7 +113,7 @@ jobs:
           else
             echo "No Entity level plugins found for ${{ inputs.entity }}"
           fi
-        working-directory: ${{ env.ENTITY_KONG_DIR }}
+        working-directory: ${{ env.ENTITY_DIR_KONG }}
 
       - name: Apply patches (Entity)
         run: |
@@ -123,7 +123,7 @@ jobs:
           else
             echo "No Entity level patches found for ${{ inputs.entity }}"
           fi
-        working-directory: ${{ env.ENTITY_KONG_DIR }}
+        working-directory: ${{ env.ENTITY_DIR_KONG }}
 
       - name: Add namespace if required
         run: |
@@ -144,27 +144,10 @@ jobs:
       - name: Add Tags
         run: |
           cat $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml | deck file add-tags $DECK_API_NAME $DECK_API_VERSION -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
-        working-directory: ${{ env.ENTITY_KONG_DIR }}
-
-      - name: Lint Kong Gateway configuration file
-        run: |
-          deck file lint -s $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml ${{ env.PLATFORM_DIR }}/kong.ruleset.yaml;
-        working-directory: ${{ env.OUTPUT_DIR }}
-
-      - name: Debug Kong declarative config
-        run: |
-          cat $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
+        working-directory: ${{ env.ENTITY_DIR_KONG }}
 
       - name: Validate Generated Kong Gateway configuration
         run: deck file validate $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
-        working-directory: ${{ env.OUTPUT_DIR }}
-
-      - name: Diff Kong Gateway configuration
-        run: |
-          deck gateway diff $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml  \
-            --konnect-addr="${{ env.KONNECT_API_URL }}" \
-            --konnect-token="${{ secrets.KONNECT_TOKEN }}" \
-            --konnect-control-plane-name="${{ env.KONNECT_CONTROL_PLANE_NAME }}" > deck_diff.txt
         working-directory: ${{ env.OUTPUT_DIR }}
 
       - name: Render Kong Gateway configuration
@@ -204,10 +187,6 @@ jobs:
           pattern: artifacts-${{ inputs.entity }}-${{ inputs.environment }}-*
           path: ./downloaded
 
-      - name: Debug downloaded artifacts
-        run: |
-          ls -la ./downloaded
-
       - name: Merge all artifacts into a single folder
         run: |
           mkdir merged-artifacts
@@ -219,24 +198,17 @@ jobs:
 
       - name: Apply governance patches
         run: |
-          cat  ${{ env.OUTPUT_DIR }}/kong-combined.yaml | deck file patch ${{ env.OUTPUT_DIR }}/kong-combined.yaml ${{ env.PLATFORM_DIR }}/kong/patches/*.yaml -o ${{ env.OUTPUT_DIR }}/kong-combined.yaml
+          cat  ${{ env.OUTPUT_DIR }}/kong-combined.yaml | deck file patch ${{ env.GOVERNANCE_DIR }}/kong/patches/*.yaml -o ${{ env.OUTPUT_DIR }}/kong-combined.yaml
 
       - name: Lint merged Kong Gateway configuration file
         run: |
-          deck file lint -s ${{ env.OUTPUT_DIR }}/kong-combined.yaml ${{ env.PLATFORM_DIR }}/kong.ruleset.yaml;
+          deck file lint -s ${{ env.OUTPUT_DIR }}/kong-combined.yaml ${{ env.GOVERNANCE_DIR }}/kong.ruleset.yaml;
         working-directory: ${{ env.OUTPUT_DIR }}
 
       - name: Validate merged Kong Gateway configuration file
         run: |
           deck file validate ${{ env.OUTPUT_DIR }}/kong-combined.yaml
         working-directory: ${{ env.OUTPUT_DIR }}
-
-      # - name: Show config in summary
-      #   run: |
-      #       echo "### 🔧 Config Preview" >> $GITHUB_STEP_SUMMARY
-      #       echo '```yaml' >> $GITHUB_STEP_SUMMARY
-      #       cat ${{ env.OUTPUT_DIR }}/kong-combined.yaml >> $GITHUB_STEP_SUMMARY
-      #       echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Show diff in summary
         run: |
@@ -273,6 +245,7 @@ jobs:
       - name: Get a backup of the previous Kong Gateway configuration
         run: |
           deck gateway dump \
+            --select-tag generated_by:apiops \
             --konnect-addr="${{ env.KONNECT_API_URL }}" \
             --konnect-token="${{ secrets.KONNECT_TOKEN }}" \
             --konnect-control-plane-name="${{ env.KONNECT_CONTROL_PLANE_NAME }}" -o kong_backup.yaml
