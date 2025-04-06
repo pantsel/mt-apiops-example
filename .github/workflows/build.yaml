@@ -46,8 +46,6 @@ jobs:
     name: Build ${{ matrix.api.name }}-${{ matrix.api.version }} on ${{ inputs.entity }} ${{ inputs.environment }}
     needs: get-apis
     runs-on: ubuntu-latest
-    environment:
-      name: ${{ inputs.environment }}
     env:
       API_SPEC: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/openapi.yaml
       API_KONG_DIR: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/kong
@@ -189,47 +187,16 @@ jobs:
           path: |
             ${{ env.OUTPUT_DIR }}/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
   
-  deploy:
-    name: Deploy on ${{ inputs.entity }} ${{ inputs.environment }}
+  combine:
+    name: Combine Kong Gateway configurations on ${{ inputs.entity }} ${{ inputs.environment }}
     needs:
       - get-apis
       - build
     runs-on: ubuntu-latest
-    environment:
-      name: ${{ inputs.environment }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: kong/setup-deck@v1
-
-      # - name: Source env.${{ inputs.environment }}.sh
-      #   run: |
-      #     set -a
-      #     source ./env.${{ inputs.environment }}.sh
-      #     set +a
-
-      #     env | grep '^DECK_' >> "$GITHUB_ENV"
-
-      #   working-directory: ${{ env.ENTITY_DIR }}
-
-      # - name: Setup extra decK variables
-      #   run: |
-
-      #     # Set the API URL
-      #     api_url="https://${{ inputs.entity }}-${{ inputs.environment }}.${{ matrix.api.name }}.svc.cluster.local:8000"
-      #     echo "DECK_API_URL=$api_url" >> $GITHUB_ENV
-
-      #     # Set the API Name
-      #     echo "DECK_API_NAME=${{ matrix.api.name }}" >> $GITHUB_ENV
-
-      #     # Set the API Version
-      #     echo "DECK_API_VERSION=${{ matrix.api.version }}" >> $GITHUB_ENV
-
-      #     # Set the deck file namespace path prefix
-      #     echo "DECK_FILE_NAMESPACE_PATH_PREFIX=${{ matrix.api.namespace }}" >> $GITHUB_ENV
-
-      #     # Set the service enabled flag
-      #     echo "DECK_SERVICE_ENABLED=${{ matrix.api.enabled }}" >> $GITHUB_ENV
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -245,9 +212,6 @@ jobs:
         run: |
           mkdir merged-artifacts
           find ./downloaded -type f -exec cp {} merged-artifacts/ \;
-
-      - name: List merged files
-        run: ls -R merged-artifacts
 
       - name: Merge all artifacts into a single file
         run: |
@@ -267,10 +231,43 @@ jobs:
           deck file validate ${{ env.OUTPUT_DIR }}/kong-combined.yaml
         working-directory: ${{ env.OUTPUT_DIR }}
 
-      - name: Debug merged Kong Gateway configuration file
+      # - name: Show config in summary
+      #   run: |
+      #       echo "### 🔧 Config Preview" >> $GITHUB_STEP_SUMMARY
+      #       echo '```yaml' >> $GITHUB_STEP_SUMMARY
+      #       cat ${{ env.OUTPUT_DIR }}/kong-combined.yaml >> $GITHUB_STEP_SUMMARY
+      #       echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Show diff in summary
         run: |
-          cat ${{ env.OUTPUT_DIR }}/kong-combined.yaml
-      
+          echo "### 🔍 Diff Preview" >> $GITHUB_STEP_SUMMARY
+          echo '```diff' >> $GITHUB_STEP_SUMMARY
+          deck gateway diff ${{ env.OUTPUT_DIR }}/kong-combined.yaml  \
+            --konnect-addr="${{ env.KONNECT_API_URL }}" \
+            --konnect-token="${{ secrets.KONNECT_TOKEN }}" \
+            --konnect-control-plane-name="${{ env.KONNECT_CONTROL_PLANE_NAME }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload combined Kong Gateway configuration
+        uses: actions/upload-artifact@v4
+        with:
+          name: kong-combined.yaml
+          path: ${{ env.OUTPUT_DIR }}/kong-combined.yaml
+
+  deploy:
+    name: Deploy combined Kong Gateway configuration on ${{ inputs.entity }} ${{ inputs.environment }}
+    needs: combine
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download combined Kong Gateway configuration
+        uses: actions/download-artifact@v4
+        with:
+          name: kong-combined.yaml
+          path: ${{ env.OUTPUT_DIR }}/kong-combined.yaml
+
       - name: Get a backup of the previous Kong Gateway configuration
         run: |
           deck gateway dump \
