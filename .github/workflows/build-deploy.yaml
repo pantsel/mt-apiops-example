@@ -89,7 +89,9 @@ jobs:
       
       - name: Lint OpenAPI Spec
         run: |
-          deck file lint -s $API_SPEC $GOVERNANCE_DIR/openapi.ruleset.yaml
+          echo "### 🔍 OAS Linting results: ${{ matrix.api.name }}-${{ matrix.api.version }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          deck file lint -s $API_SPEC $GOVERNANCE_DIR/openapi.ruleset.yaml >> $GITHUB_STEP_SUMMARY
 
       - name: Convert OpenAPI Spec to Kong declarative config
         run: |
