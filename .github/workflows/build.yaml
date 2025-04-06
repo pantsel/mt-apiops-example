@@ -39,7 +39,7 @@ jobs:
       - name: Get enabled APIs from metadata
         id: set-apis
         run: |
-          APIS=$(jq -c '[.apis[] | select(.enabled==true) | . ]' $ENTITY_METADATA)
+          APIS=$(jq -c '[.environments[] | select(.name=="${{ inputs.environment }}") | .apis[] | . ]' $ENTITY_METADATA)
           echo "apis=$APIS" >> $GITHUB_OUTPUT
 
   build:
@@ -83,6 +83,9 @@ jobs:
 
           # Set the deck file namespace path prefix
           echo "DECK_FILE_NAMESPACE_PATH_PREFIX=${{ matrix.api.namespace }}" >> $GITHUB_ENV
+
+          # Set the service enabled flag
+          echo "DECK_SERVICE_ENABLED=${{ matrix.api.enabled }}" >> $GITHUB_ENV
       
       - name: Lint OpenAPI Spec
         run: |
@@ -220,7 +223,9 @@ jobs:
 
           # Set the deck file namespace path prefix
           echo "DECK_FILE_NAMESPACE_PATH_PREFIX=${{ matrix.api.namespace }}" >> $GITHUB_ENV
-  
+
+          # Set the service enabled flag
+          echo "DECK_SERVICE_ENABLED=${{ matrix.api.enabled }}" >> $GITHUB_ENV
       
       - name: Get a backup of the previous Kong Gateway configuration
         run: |

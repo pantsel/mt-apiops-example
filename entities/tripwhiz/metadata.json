@@ -1,16 +1,40 @@
 {
-    "apis": [
+    "environments": [
         {
-            "name": "flights",
-            "version": "v1",
-            "enabled": true,
-            "namespace": "/entity-1/flights/v1"
+            "name": "development",
+            "apis": [
+                {
+                    "name": "flights",
+                    "version": "v1",
+                    "enabled": true,
+                    "namespace": "/tripwhiz/flights/v1"
+                },
+                {
+                    "name": "routes",
+                    "version": "v1",
+                    "enabled": true,
+                    "namespace": "/tripwhiz/routes/v1"
+                }
+            ]
+                
         },
         {
-            "name": "routes",
-            "version": "v1",
-            "enabled": true,
-            "namespace": "/entity-1/routes/v1"
+            "name": "production",
+            "apis": [
+                {
+                    "name": "flights",
+                    "version": "v1",
+                    "enabled": true,
+                    "namespace": "/tripwhiz/flights/v1"
+                },
+                {
+                    "name": "routes",
+                    "version": "v1",
+                    "enabled": false,
+                    "namespace": "/tripwhiz/routes/v1"
+                }
+            ]
+                
         }
     ]
 }
