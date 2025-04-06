@@ -2,27 +2,15 @@ name: 'Load Environment Variables'
 description: 'Loads environment variables from entity and environment specific files'
 
 inputs:
-  entity-common-vars:
-    description: 'Path to entity common variables file'
-    required: true
-  entity-env-vars:
-    description: 'Path to entity environment variables file'
-    required: true
   entity:
     description: 'The entity name'
     required: true
   environment:
     description: 'The environment name'
     required: true
-  api-name:
-    description: 'The API name'
-    required: true
-  api-namespace:
-    description: 'The API namespace'
-    required: true
-  api-enabled:
-    description: 'Whether the API is enabled'
-    required: true
+  api:
+    description: 'The API object'
+    required: true  # JSON string of the api object 
 
 runs:
   using: "composite"
@@ -30,7 +18,7 @@ runs:
     - name: Source decK environment variables
       shell: bash
       run: |
-        for file in ${{ inputs.entity-common-vars }} ${{ inputs.entity-env-vars }}; do
+        for file in ${{ env.ENTITY_COMMON_VARS }} ${{ env.ENTITY_ENV_VARS }}; do
           if [ -f "$file" ]; then
             set -a
             echo "Sourcing $file"
@@ -45,21 +33,17 @@ runs:
     - name: Setup extra decK variables
       shell: bash
       run: |
-        # Set the API URL
-        api_url="https://${{ inputs.entity }}-${{ inputs.environment }}.${{ inputs.api-name }}.svc.cluster.local:8000"
+
+        api_name=$(echo '${{ inputs.api }}' | jq -r .name)
+        api_url="https://${{ inputs.entity }}-${{ inputs.environment }}.${api_name}.svc.cluster.local:8000"
+        api_version=$(echo '${{ inputs.api }}' | jq -r .version)
+        api_namespace=$(echo '${{ inputs.api }}' | jq -r .namespace)
+        api_enabled=$(echo '${{ inputs.api }}' | jq -r .enabled)
+        config_oidc_issuer="https://auth-${{ inputs.entity }}-${{ inputs.environment }}.myidp.com/auth/realms/master/.well-known/openid-configuration"
+
         echo "DECK_API_URL=$api_url" >> $GITHUB_ENV
-
-        # Set the API Name
-        echo "DECK_API_NAME=${{ inputs.api-name }}" >> $GITHUB_ENV
-
-        # Set the API Version
-        echo "DECK_API_VERSION=${{ inputs.api-version }}" >> $GITHUB_ENV
-
-        # Set the deck file namespace path prefix
-        echo "DECK_FILE_NAMESPACE_PATH_PREFIX=${{ inputs.api-namespace }}" >> $GITHUB_ENV
-
-        # Set the service enabled flag
-        echo "DECK_SERVICE_ENABLED=${{ inputs.api-enabled }}" >> $GITHUB_ENV
-
-        # Set the oidc issuer
-        echo "DECK_CONFIG_OIDC_ISSUER=https://auth-${{ inputs.entity }}-${{ inputs.environment }}.myidp.com/auth/realms/master/.well-known/openid-configuration" >> $GITHUB_ENV 
+        echo "DECK_API_NAME=$api_name" >> $GITHUB_ENV
+        echo "DECK_API_VERSION=$api_version" >> $GITHUB_ENV
+        echo "DECK_FILE_NAMESPACE_PATH_PREFIX=$api_namespace" >> $GITHUB_ENV
+        echo "DECK_SERVICE_ENABLED=$api_enabled" >> $GITHUB_ENV
+        echo "DECK_CONFIG_OIDC_ISSUER=$config_oidc_issuer" >> $GITHUB_ENV
