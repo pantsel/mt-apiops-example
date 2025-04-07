@@ -1,0 +1,10 @@
+{
+    "apis": [
+            {
+                "name": "routes",
+                "version": "v1",
+                "enabled": false,
+                "namespace": "/roameasy/routes/v1"
+            }
+        ]
+}

@@ -9,6 +9,7 @@ on:
         description: "The entity to build the configuration for"
         options:
           - tripwhiz
+          - roameasy
       environment:
         required: true
         type: choice

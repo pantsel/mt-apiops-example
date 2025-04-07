@@ -1,0 +1,10 @@
+{
+    "apis": [
+            {
+                "name": "flights",
+                "version": "v1",
+                "enabled": true,
+                "namespace": "/roameasy/flights/v1"
+            }
+        ]
+}
