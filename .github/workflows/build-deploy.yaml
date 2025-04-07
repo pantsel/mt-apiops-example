@@ -42,6 +42,9 @@ env:
   GOVERNANCE_ENV_VARS: ${{ github.workspace }}/governance/environments/${{ inputs.environment }}/env.sh
   GOVERNANCE_COMMON_VARS: ${{ github.workspace }}/governance/env.sh
 
+  # DecK relatec variables scoped to the entity and environment
+  DECK_CONFIG_OIDC_ISSUER: https://auth-${{ inputs.entity }}-${{ inputs.environment }}.myidp.com/auth/realms/master/.well-known/openid-configuration
+
 jobs:
   get-apis:
     runs-on: ubuntu-latest
@@ -61,6 +64,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       API_SPEC: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/openapi.yaml
+      DECK_API_NAME: ${{ matrix.api.name }}
+      DECK_API_VERSION: ${{ matrix.api.version }}
+      DECK_API_URL: https://${{ inputs.entity }}-${{ inputs.environment }}.${{ matrix.api.name }}.svc.cluster.local:8000
+      DECK_FILE_NAMESPACE_PATH_PREFIX: ${{ matrix.api.namespace }}
+      DECK_SERVICE_ENABLED: ${{ matrix.api.enabled }}
       API_KONG_DIR: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/kong
     strategy:
       matrix:
@@ -76,7 +84,6 @@ jobs:
         with:
           entity: ${{ inputs.entity }}
           environment: ${{ inputs.environment }}
-          api: ${{ toJson(matrix.api) }}
 
       - name: Lint OpenAPI Spec
         run: |
@@ -174,7 +181,6 @@ jobs:
         with:
           entity: ${{ inputs.entity }}
           environment: ${{ inputs.environment }}
-          api: ${{ toJson(matrix.api) }}
           
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -253,7 +259,6 @@ jobs:
         with:
           entity: ${{ inputs.entity }}
           environment: ${{ inputs.environment }}
-          api: ${{ toJson(matrix.api) }}
 
       - name: Download combined Kong Gateway configuration
         uses: actions/download-artifact@v4

@@ -8,9 +8,6 @@ inputs:
   environment:
     description: 'The environment name'
     required: true
-  api:
-    description: 'The API object'
-    required: true  # JSON string of the api object 
 
 runs:
   using: "composite"
@@ -18,32 +15,31 @@ runs:
     - name: Source decK environment variables
       shell: bash
       run: |
-        for file in ${{ env.ENTITY_COMMON_VARS }} ${{ env.ENTITY_ENV_VARS }} ${{ env.GOVERNANCE_COMMON_VARS }} ${{ env.GOVERNANCE_ENV_VARS }}; do
+        echo "::group::Sourcing environment variable files"
+
+        files=(
+          "${{ env.ENTITY_COMMON_VARS }}"
+          "${{ env.ENTITY_ENV_VARS }}"
+          "${{ env.GOVERNANCE_COMMON_VARS }}"
+          "${{ env.GOVERNANCE_ENV_VARS }}"
+        )
+
+        for file in "${files[@]}"; do
           if [ -f "$file" ]; then
-            set -a
             echo "Sourcing $file"
-            source $file
+            set -a
+            source "$file"
             set +a
-            env | grep '^DECK_' >> "$GITHUB_ENV"
           else
             echo "No environment file found for $file. Skipping."
           fi
         done
 
-    - name: Setup extra decK variables
-      shell: bash
-      run: |
+        # Export final values of DECK_ variables to GITHUB_ENV
+        while IFS='=' read -r key value; do
+          if [[ $key == DECK_* ]]; then
+            echo "$key=$value" >> "$GITHUB_ENV"
+          fi
+        done < <(env)
 
-        api_name=$(echo '${{ inputs.api }}' | jq -r .name)
-        api_url="https://${{ inputs.entity }}-${{ inputs.environment }}.${api_name}.svc.cluster.local:8000"
-        api_version=$(echo '${{ inputs.api }}' | jq -r .version)
-        api_namespace=$(echo '${{ inputs.api }}' | jq -r .namespace)
-        api_enabled=$(echo '${{ inputs.api }}' | jq -r .enabled)
-        config_oidc_issuer="https://auth-${{ inputs.entity }}-${{ inputs.environment }}.myidp.com/auth/realms/master/.well-known/openid-configuration"
-
-        echo "DECK_API_URL=$api_url" >> $GITHUB_ENV
-        echo "DECK_API_NAME=$api_name" >> $GITHUB_ENV
-        echo "DECK_API_VERSION=$api_version" >> $GITHUB_ENV
-        echo "DECK_FILE_NAMESPACE_PATH_PREFIX=$api_namespace" >> $GITHUB_ENV
-        echo "DECK_SERVICE_ENABLED=$api_enabled" >> $GITHUB_ENV
-        echo "DECK_CONFIG_OIDC_ISSUER=$config_oidc_issuer" >> $GITHUB_ENV
+        echo "::endgroup::"
