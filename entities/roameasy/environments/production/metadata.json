@@ -11,6 +11,12 @@
                 "version": "v1",
                 "enabled": false,
                 "namespace": "/roameasy/routes/v1"
+            },
+            {
+                "name": "bookings",
+                "version": "v1",
+                "enabled": true,
+                "namespace": "/roameasy/bookings/v1"
             }
         ]
 }

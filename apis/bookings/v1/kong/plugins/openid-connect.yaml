@@ -1,0 +1,12 @@
+---
+_format_version: '3.0'
+add-plugins:
+- selectors:
+  - "$..services[0].routes[?(@.name=='bookings-service_health-check-v1')]"
+  overwrite: false
+  plugins:
+    - name: openid-connect
+      instance_name: bookings-service_health-route-override
+      config:
+        issuer: ${{ env "DECK_CONFIG_OIDC_ISSUER" }}
+        anonymous: anonymous_consumer

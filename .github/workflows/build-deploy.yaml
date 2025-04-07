@@ -145,6 +145,10 @@ jobs:
           cat $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml | deck file add-tags $DECK_API_NAME $DECK_API_VERSION -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
         working-directory: ${{ env.ENTITY_DIR_KONG }}
 
+      - name: Show rendered Kong Gateway configuration
+        run: |
+          cat $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
+
       # Render the configuration here to "lock in" all entity-specific and environment-specific
       # values. This ensures the Kong Gateway configuration is finalized for this entity and
       # environment. The next job will work with the merged configurations, so all variables
@@ -154,6 +158,8 @@ jobs:
           deck file render --populate-env-vars $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml \
             -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
         working-directory: ${{ env.OUTPUT_DIR }}
+
+
 
       - name: Validate Generated Kong Gateway configuration
         run: deck file validate $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml

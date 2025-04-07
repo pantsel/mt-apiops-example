@@ -11,6 +11,12 @@
                 "version": "v1",
                 "enabled": true,
                 "namespace": "/tripwhiz/routes/v1"
+            },
+            {
+                "name": "bookings",
+                "version": "v1",
+                "enabled": true,
+                "namespace": "/tripwhiz/bookings/v1"
             }
         ]
 }
