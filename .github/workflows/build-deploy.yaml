@@ -28,6 +28,10 @@ env:
   KONNECT_API_URL: https://eu.api.konghq.com
   KONNECT_CONTROL_PLANE_NAME: ${{ inputs.entity }}-${{ inputs.environment }}
   APIS_DIR: ${{ github.workspace }}/apis
+  ENTITIES_DIR: ${{ github.workspace }}/entities
+  ENTITIES_DIR_KONG: ${{ github.workspace }}/entities/kong
+  ENTITIES_ENV_VARS: ${{ github.workspace }}/entities/environments/${{ inputs.environment }}/env.sh
+  ENTITIES_COMMON_VARS: ${{ github.workspace }}/entities/env.sh
   ENTITY_DIR: ${{ github.workspace }}/entities/${{ inputs.entity }}
   ENTITY_DIR_KONG: ${{ github.workspace }}/entities/${{ inputs.entity }}/kong
   ENTITY_METADATA: ${{ github.workspace }}/entities/${{ inputs.entity }}/environments/${{ inputs.environment }}/metadata.json
@@ -133,14 +137,18 @@ jobs:
           cat $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml | deck file add-tags $DECK_API_NAME $DECK_API_VERSION -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
         working-directory: ${{ env.ENTITY_DIR_KONG }}
 
-      - name: Validate Generated Kong Gateway configuration
-        run: deck file validate $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
-        working-directory: ${{ env.OUTPUT_DIR }}
-
+      # Render the configuration here to "lock in" all entity-specific and environment-specific
+      # values. This ensures the Kong Gateway configuration is finalized for this entity and
+      # environment. The next job will work with the merged configurations, so all variables
+      # and replacements must be resolved at this stage.
       - name: Render Kong Gateway configuration
         run: |
           deck file render --populate-env-vars $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml \
             -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
+        working-directory: ${{ env.OUTPUT_DIR }}
+
+      - name: Validate Generated Kong Gateway configuration
+        run: deck file validate $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
         working-directory: ${{ env.OUTPUT_DIR }}
 
       - name: Upload artifacts
