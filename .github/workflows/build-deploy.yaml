@@ -204,7 +204,7 @@ jobs:
         run: |
           deck file merge merged-artifacts/*-kong.yaml -o ${{ env.OUTPUT_DIR }}/kong-combined.yaml
 
-      - name: Apply governance plugins
+      - name: Add governance plugins
         run: |
           cat  ${{ env.OUTPUT_DIR }}/kong-combined.yaml | deck file add-plugins ${{ env.GOVERNANCE_DIR }}/kong/plugins/*.yaml -o ${{ env.OUTPUT_DIR }}/kong-combined.yaml
 
