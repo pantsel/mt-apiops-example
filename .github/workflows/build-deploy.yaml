@@ -65,12 +65,16 @@ jobs:
     runs-on: ubuntu-latest
     env:
       API_SPEC: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/openapi.yaml
+      API_KONG_DIR: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/kong
+
+      # Deck variables scoped to the Entity and Environment
+      # These are used to populate the Kong Gateway configuration templates (plugins, patches, etc)
       DECK_API_NAME: ${{ matrix.api.name }}
       DECK_API_VERSION: ${{ matrix.api.version }}
       DECK_API_URL: https://${{ inputs.entity }}-${{ inputs.environment }}.${{ matrix.api.name }}.svc.cluster.local:8000
       DECK_FILE_NAMESPACE_PATH_PREFIX: ${{ matrix.api.namespace }}
       DECK_SERVICE_ENABLED: ${{ matrix.api.enabled }}
-      API_KONG_DIR: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/kong
+      DECK_ENTITY_NAME: ${{ inputs.entity }}-${{ inputs.environment }}
     strategy:
       matrix:
         api: ${{ fromJson(needs.get-apis.outputs.apis) }}
@@ -143,10 +147,6 @@ jobs:
           cat $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml | deck file add-tags $DECK_API_NAME $DECK_API_VERSION -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
         working-directory: ${{ env.ENTITY_DIR_KONG }}
 
-      - name: Show rendered Kong Gateway configuration
-        run: |
-          cat $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
-
       # Render the configuration here to "lock in" all entity-specific and environment-specific
       # values. This ensures the Kong Gateway configuration is finalized for this entity and
       # environment. The next job will work with the merged configurations, so all variables
@@ -156,8 +156,6 @@ jobs:
           deck file render --populate-env-vars $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml \
             -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
         working-directory: ${{ env.OUTPUT_DIR }}
-
-
 
       - name: Validate Generated Kong Gateway configuration
         run: deck file validate $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
@@ -176,6 +174,10 @@ jobs:
       - get-apis
       - build
     runs-on: ubuntu-latest
+    env:
+      # Deck variables scoped to the Entity and Environment
+      # These are used to populate the Kong Gateway configuration templates (plugins, patches, etc)
+      DECK_CONFIG_OTEL_SERVICE_NAME: kong-dp-${{ inputs.entity }}-${{ inputs.environment }}
     steps:
       - uses: actions/checkout@v4
 
@@ -209,6 +211,20 @@ jobs:
       - name: Apply governance patches
         run: |
           cat  ${{ env.OUTPUT_DIR }}/kong-combined.yaml | deck file patch ${{ env.GOVERNANCE_DIR }}/kong/patches/*.yaml -o ${{ env.OUTPUT_DIR }}/kong-combined.yaml
+
+      - name: Render merged Kong Gateway configuration
+        run: |
+          deck file render --populate-env-vars ${{ env.OUTPUT_DIR }}/kong-combined.yaml \
+            -o ${{ env.OUTPUT_DIR }}/kong-combined.yaml
+        working-directory: ${{ env.OUTPUT_DIR }}
+
+      # This ensures the _info block is applied to the Kong Gateway configuration.
+      # The _info block contains object defaults and select_tags.
+      # https://docs.konghq.com/deck/gateway/defaults/
+      - name: Ensure _info block is applied
+        run: |
+          cat ${{ env.OUTPUT_DIR }}/kong-combined.yaml | deck file patch ${{ env.GOVERNANCE_DIR }}/kong/patches/info.yaml -o ${{ env.OUTPUT_DIR }}/kong-combined.yaml
+        working-directory: ${{ env.OUTPUT_DIR }}
 
       - name: Lint merged Kong Gateway configuration file
         run: |
