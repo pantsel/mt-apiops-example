@@ -32,7 +32,7 @@ concurrency:
 
 jobs:
   get-apis:
-    uses: ./.github/workflows/templates/get-apis.yaml
+    uses: ./.github/workflows/get-apis.yaml
     with:
       entity: ${{ inputs.entity }}
       environment: ${{ inputs.environment }}
@@ -42,7 +42,7 @@ jobs:
 
   build:
     needs: get-apis
-    uses: ./.github/workflows/templates/build.yaml
+    uses: ./.github/workflows/build.yaml
     with:
       entity: ${{ inputs.entity }}
       environment: ${{ inputs.environment }}
@@ -52,7 +52,7 @@ jobs:
 
   combine:
     needs: [get-apis, build]
-    uses: ./.github/workflows/templates/combine.yaml
+    uses: ./.github/workflows/combine.yaml
     with:
       entity: ${{ inputs.entity }}
       environment: ${{ inputs.environment }}
@@ -62,7 +62,7 @@ jobs:
 
   deploy:
     needs: combine
-    uses: ./.github/workflows/templates/deploy.yaml
+    uses: ./.github/workflows/deploy.yaml
     with:
       entity: ${{ inputs.entity }}
       environment: ${{ inputs.environment }}
