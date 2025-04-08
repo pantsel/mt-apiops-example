@@ -1,0 +1,34 @@
+name: Get APIs
+
+on:
+  workflow_call:
+    inputs:
+      entity:
+        required: true
+        type: string
+      environment:
+        required: true
+        type: string
+      entity_metadata:
+        required: true
+        type: string
+    outputs:
+      apis:
+        description: "List of enabled APIs"
+        value: ${{ jobs.get-apis.outputs.apis }}
+    secrets:
+      KONNECT_TOKEN:
+        required: true
+
+jobs:
+  get-apis:
+    runs-on: ubuntu-latest
+    outputs:
+      apis: ${{ steps.set-apis.outputs.apis }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get enabled APIs from metadata
+        id: set-apis
+        run: |
+          APIS=$(jq -c '[ .apis[] | . ]' ${{ inputs.entity_metadata }})
+          echo "apis=$APIS" >> $GITHUB_OUTPUT 

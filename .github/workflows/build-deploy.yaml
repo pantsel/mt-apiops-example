@@ -25,321 +25,46 @@ on:
         description: "Show the summary of the build and deploy process"
         default: true
 
-env:
-  KONNECT_API_URL: https://eu.api.konghq.com
-  KONNECT_CONTROL_PLANE_NAME: ${{ inputs.entity }}-${{ inputs.environment }}
-  APIS_DIR: ${{ github.workspace }}/apis
-  ENTITIES_DIR: ${{ github.workspace }}/entities
-  ENTITIES_DIR_KONG: ${{ github.workspace }}/entities/.common/kong
-  ENTITIES_ENV_VARS: ${{ github.workspace }}/entities/environments/${{ inputs.environment }}/env.sh
-  ENTITIES_COMMON_VARS: ${{ github.workspace }}/entities/.common/env.sh
-  ENTITY_DIR: ${{ github.workspace }}/entities/${{ inputs.entity }}
-  ENTITY_DIR_KONG: ${{ github.workspace }}/entities/${{ inputs.entity }}/kong
-  ENTITY_METADATA: ${{ github.workspace }}/entities/${{ inputs.entity }}/environments/${{ inputs.environment }}/metadata.json
-  ENTITY_ENV_VARS: ${{ github.workspace }}/entities/${{ inputs.entity }}/environments/${{ inputs.environment }}/env.sh
-  ENTITY_COMMON_VARS: ${{ github.workspace }}/entities/${{ inputs.entity }}/env.sh
-  OUTPUT_DIR: ${{ github.workspace }}/.generated
-  GOVERNANCE_DIR: ${{ github.workspace }}/governance
-  GOVERNANCE_ENV_VARS: ${{ github.workspace }}/governance/environments/${{ inputs.environment }}/env.sh
-  GOVERNANCE_COMMON_VARS: ${{ github.workspace }}/governance/env.sh
-
-  # DecK related variables scoped to the entity and environment
-  DECK_CONFIG_OIDC_ISSUER: https://auth-${{ inputs.entity }}-${{ inputs.environment }}.myidp.com/auth/realms/master/.well-known/openid-configuration
+# Prevent multiple deployments to the same environment at the same time
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.entity }}-${{ inputs.environment }}
+  cancel-in-progress: true
 
 jobs:
   get-apis:
-    runs-on: ubuntu-latest
-    outputs:
-      apis: ${{ steps.set-apis.outputs.apis }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Get enabled APIs from metadata
-        id: set-apis
-        run: |
-          APIS=$(jq -c '[ .apis[] | . ]' $ENTITY_METADATA)
-          echo "apis=$APIS" >> $GITHUB_OUTPUT
+    uses: ./.github/workflows/templates/get-apis.yaml
+    with:
+      entity: ${{ inputs.entity }}
+      environment: ${{ inputs.environment }}
+      entity_metadata: ./entities/${{ inputs.entity }}/environments/${{ inputs.environment }}/metadata.json
+    secrets:
+      KONNECT_TOKEN: ${{ secrets.KONNECT_TOKEN }}
 
   build:
-    name: Build ${{ matrix.api.name }}-${{ matrix.api.version }} on ${{ inputs.entity }} ${{ inputs.environment }}
     needs: get-apis
-    runs-on: ubuntu-latest
-    env:
-      API_SPEC: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/openapi.yaml
-      API_KONG_DIR: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/kong
+    uses: ./.github/workflows/templates/build.yaml
+    with:
+      entity: ${{ inputs.entity }}
+      environment: ${{ inputs.environment }}
+      apis: ${{ needs.get-apis.outputs.apis }}
+    secrets:
+      KONNECT_TOKEN: ${{ secrets.KONNECT_TOKEN }}
 
-      # Deck variables scoped to the Entity and Environment
-      # These are used to populate the Kong Gateway configuration templates (plugins, patches, etc)
-      DECK_API_NAME: ${{ matrix.api.name }}
-      DECK_API_VERSION: ${{ matrix.api.version }}
-      DECK_API_URL: https://${{ inputs.entity }}-${{ inputs.environment }}.${{ matrix.api.name }}.svc.cluster.local:8000
-      DECK_FILE_NAMESPACE_PATH_PREFIX: ${{ matrix.api.namespace }}
-      DECK_SERVICE_ENABLED: ${{ matrix.api.enabled }}
-      DECK_ENTITY_NAME: ${{ inputs.entity }}-${{ inputs.environment }}
-    strategy:
-      matrix:
-        api: ${{ fromJson(needs.get-apis.outputs.apis) }}
-    
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: kong/setup-deck@v1
-
-      - name: Load environment variables
-        uses: ./.github/actions/load-env
-        with:
-          entity: ${{ inputs.entity }}
-          environment: ${{ inputs.environment }}
-
-      - name: Lint OpenAPI Spec
-        run: |
-          deck file lint -s $API_SPEC $GOVERNANCE_DIR/openapi.ruleset.yaml
-
-      - name: Convert OpenAPI Spec to Kong declarative config
-        run: |
-          cat ${{ env.API_SPEC }} | deck file openapi2kong --generate-security -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
-
-      - name: Add plugins
-        run: |
-          plugin_folders=(
-            "${{ env.ENTITIES_DIR_KONG }}/plugins"
-            "${{ env.ENTITY_DIR_KONG }}/plugins"
-            "${{ env.API_KONG_DIR }}/plugins"
-          )
-
-          for plugin_folder in "${plugin_folders[@]}"; do
-            if [ -d "$plugin_folder" ] && [ "$(ls -A $plugin_folder/*.yaml 2>/dev/null)" ]; then
-              cat $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml | deck file add-plugins $plugin_folder/*.yaml -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
-            fi
-          done
-
-      - name: Apply patches
-        run: |
-          patch_folders=(
-            "${{ env.ENTITIES_DIR_KONG }}/patches"
-            "${{ env.ENTITY_DIR_KONG }}/patches"
-            "${{ env.API_KONG_DIR }}/patches"
-          )
-
-          for patch_folder in "${patch_folders[@]}"; do
-            if [ -d "$patch_folder" ] && [ "$(ls -A $patch_folder/*.yaml 2>/dev/null)" ]; then
-              cat $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml | deck file patch $patch_folder/*.yaml -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
-            fi
-          done
-
-      - name: Add namespace if required
-        run: |
-          if [ -n "$DECK_FILE_NAMESPACE_PATH_PREFIX" ] || [ -n "$DECK_FILE_NAMESPACE_HOST" ]; then
-            cmd="deck file namespace"
-          if [ -n "$DECK_FILE_NAMESPACE_PATH_PREFIX" ]; then
-            cmd="$cmd --path-prefix=$DECK_FILE_NAMESPACE_PATH_PREFIX"
-          fi
-          if [ -n "$DECK_FILE_NAMESPACE_HOST" ]; then
-            cmd="$cmd --host=$DECK_FILE_NAMESPACE_HOST"
-          fi
-            cat $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml | $cmd -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
-          else
-            echo "Skipping namespace step as both path-prefix and host are empty."
-          fi
-        working-directory:  ${{ env.OUTPUT_DIR }}
-
-      - name: Add Tags
-        run: |
-          cat $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml | deck file add-tags $DECK_API_NAME $DECK_API_VERSION -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
-        working-directory: ${{ env.ENTITY_DIR_KONG }}
-
-      # Render the configuration here to "lock in" all entity-specific and environment-specific
-      # values. This ensures the Kong Gateway configuration is finalized for this entity and
-      # environment. The next job will work with the merged configurations, so all variables
-      # and replacements must be resolved at this stage.
-      - name: Render Kong Gateway configuration
-        run: |
-          deck file render --populate-env-vars $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml \
-            -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
-        working-directory: ${{ env.OUTPUT_DIR }}
-
-      - name: Validate Generated Kong Gateway configuration
-        run: deck file validate $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
-        working-directory: ${{ env.OUTPUT_DIR }}
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: artifacts-${{ inputs.entity }}-${{ inputs.environment }}-${{ matrix.api.name }}-${{ matrix.api.version }}
-          path: |
-            ${{ env.OUTPUT_DIR }}/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
-  
   combine:
-    name: Combine Kong Gateway configurations on ${{ inputs.entity }} ${{ inputs.environment }}
-    needs:
-      - get-apis
-      - build
-    runs-on: ubuntu-latest
-    env:
-      # Deck variables scoped to the Entity and Environment
-      # These are used to populate the Kong Gateway configuration templates (plugins, patches, etc)
-      DECK_CONFIG_OTEL_SERVICE_NAME: kong-dp-${{ inputs.entity }}-${{ inputs.environment }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: kong/setup-deck@v1
-
-      - name: Load environment variables
-        uses: ./.github/actions/load-env
-        with:
-          entity: ${{ inputs.entity }}
-          environment: ${{ inputs.environment }}
-          
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: artifacts-${{ inputs.entity }}-${{ inputs.environment }}-*
-          path: ./downloaded
-
-      - name: Merge all artifacts into a single folder
-        run: |
-          mkdir merged-artifacts
-          find ./downloaded -type f -exec cp {} merged-artifacts/ \;
-
-      - name: Merge all artifacts into a single file
-        run: |
-          deck file merge merged-artifacts/*-kong.yaml -o ${{ env.OUTPUT_DIR }}/kong-combined.yaml
-
-      - name: Add governance plugins
-        run: |
-          cat  ${{ env.OUTPUT_DIR }}/kong-combined.yaml | deck file add-plugins ${{ env.GOVERNANCE_DIR }}/kong/plugins/*.yaml -o ${{ env.OUTPUT_DIR }}/kong-combined.yaml
-
-      - name: Apply governance patches
-        run: |
-          cat  ${{ env.OUTPUT_DIR }}/kong-combined.yaml | deck file patch ${{ env.GOVERNANCE_DIR }}/kong/patches/*.yaml -o ${{ env.OUTPUT_DIR }}/kong-combined.yaml
-
-      - name: Render merged Kong Gateway configuration
-        run: |
-          deck file render --populate-env-vars ${{ env.OUTPUT_DIR }}/kong-combined.yaml \
-            -o ${{ env.OUTPUT_DIR }}/kong-combined.yaml
-        working-directory: ${{ env.OUTPUT_DIR }}
-
-      # This ensures the _info block is applied to the Kong Gateway configuration.
-      # The _info block contains object defaults and select_tags.
-      # https://docs.konghq.com/deck/gateway/defaults/
-      - name: Ensure _info block is applied
-        run: |
-          cat ${{ env.OUTPUT_DIR }}/kong-combined.yaml | deck file patch ${{ env.GOVERNANCE_DIR }}/kong/patches/info.yaml -o ${{ env.OUTPUT_DIR }}/kong-combined.yaml
-        working-directory: ${{ env.OUTPUT_DIR }}
-
-      - name: Lint merged Kong Gateway configuration file
-        run: |
-          deck file lint -s ${{ env.OUTPUT_DIR }}/kong-combined.yaml ${{ env.GOVERNANCE_DIR }}/kong.ruleset.yaml;
-        working-directory: ${{ env.OUTPUT_DIR }}
-
-      - name: Validate merged Kong Gateway configuration file
-        run: |
-          deck file validate ${{ env.OUTPUT_DIR }}/kong-combined.yaml
-        working-directory: ${{ env.OUTPUT_DIR }}
-
-      - name: Debug
-        run: |
-          cat ${{ env.OUTPUT_DIR }}/kong-combined.yaml
-
-      - name: Show combined config in summary
-        if: ${{ inputs.show-summary }}
-        run: |
-            echo "### 🔧 Combined config Preview" >> $GITHUB_STEP_SUMMARY
-            echo '```yaml' >> $GITHUB_STEP_SUMMARY
-            cat ${{ env.OUTPUT_DIR }}/kong-combined.yaml >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-
-      - name: Show diff in summary
-        if: ${{ inputs.show-summary }}
-        run: |
-          echo "### 🔍 Diff Preview" >> $GITHUB_STEP_SUMMARY
-          echo '```diff' >> $GITHUB_STEP_SUMMARY
-          deck gateway diff ${{ env.OUTPUT_DIR }}/kong-combined.yaml  \
-            --konnect-addr="${{ env.KONNECT_API_URL }}" \
-            --konnect-token="${{ secrets.KONNECT_TOKEN }}" \
-            --konnect-control-plane-name="${{ env.KONNECT_CONTROL_PLANE_NAME }}" >> $GITHUB_STEP_SUMMARY
-
-      - name: Upload combined Kong Gateway configuration
-        uses: actions/upload-artifact@v4
-        with:
-          name: kong-combined
-          path: ${{ env.OUTPUT_DIR }}/kong-combined.yaml
+    needs: [get-apis, build]
+    uses: ./.github/workflows/templates/combine.yaml
+    with:
+      entity: ${{ inputs.entity }}
+      environment: ${{ inputs.environment }}
+      show_summary: ${{ inputs.show-summary }}
+    secrets:
+      KONNECT_TOKEN: ${{ secrets.KONNECT_TOKEN }}
 
   deploy:
-    name: Deploy combined Kong Gateway configuration on ${{ inputs.entity }} ${{ inputs.environment }}
     needs: combine
-    runs-on: ubuntu-latest
-    environment:
-      name: ${{ inputs.environment }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: kong/setup-deck@v1
-
-      - name: Load environment variables
-        uses: ./.github/actions/load-env
-        with:
-          entity: ${{ inputs.entity }}
-          environment: ${{ inputs.environment }}
-
-      - name: Download combined Kong Gateway configuration
-        uses: actions/download-artifact@v4
-        with:
-          name: kong-combined
-          path: ${{ env.OUTPUT_DIR }}/kong-combined.yaml
-
-      - name: Get a backup of the previous Kong Gateway configuration
-        run: |
-          deck gateway dump \
-            --select-tag generated_by:apiops \
-            --konnect-addr="${{ env.KONNECT_API_URL }}" \
-            --konnect-token="${{ secrets.KONNECT_TOKEN }}" \
-            --konnect-control-plane-name="${{ env.KONNECT_CONTROL_PLANE_NAME }}" -o ${{ env.OUTPUT_DIR }}/kong_backup.yaml
-
-      - name: Sync Kong Gateway configuration
-        id: sync
-        run: |
-          deck gateway sync ${{ env.OUTPUT_DIR }}/kong-combined.yaml  \
-            --no-mask-deck-env-vars-value \
-            --konnect-addr="${{ env.KONNECT_API_URL }}" \
-            --konnect-token="${{ secrets.KONNECT_TOKEN }}" \
-            --konnect-control-plane-name="${{ env.KONNECT_CONTROL_PLANE_NAME }}"
-        continue-on-error: true
-
-      - name: Wait for changes to be propagated
-        if: ${{ steps.sync.outcome == 'success' }}
-        run: |
-          sleep 5
-
-      - name: Test the API
-        if: ${{ steps.sync.outcome == 'success' }}
-        id: test
-        run: |
-          # Add tests to check the API is working
-          echo "API is working"
-          exit 0
-        continue-on-error: true
-
-      - name: Revert to backup if sync or tests fail
-        if: ${{ steps.sync.outcome == 'failure' || steps.test.outcome == 'failure' }}
-        run: |
-          deck gateway sync ${{ env.OUTPUT_DIR }}/kong_backup.yaml  \
-            --no-mask-deck-env-vars-value \
-            --konnect-addr="${{ env.KONNECT_API_URL }}" \
-            --konnect-token="${{ secrets.KONNECT_TOKEN }}" \
-            --konnect-control-plane-name="${{ env.KONNECT_CONTROL_PLANE_NAME }}"
-
-      - name: Get recent backup
-        if: ${{ steps.test.outcome == 'success' }}
-        run: |
-          deck gateway dump \
-            --yes \
-            --select-tag generated_by:apiops \
-            --konnect-addr="${{ env.KONNECT_API_URL }}" \
-            --konnect-token="${{ secrets.KONNECT_TOKEN }}" \
-            --konnect-control-plane-name="${{ env.KONNECT_CONTROL_PLANE_NAME }}" -o ${{ env.OUTPUT_DIR }}/kong_backup.yaml
-
-      - name: Upload recent backup
-        uses: actions/upload-artifact@v4
-        with:
-          name: backup
-          path: ${{ env.OUTPUT_DIR }}/kong_backup.yaml
+    uses: ./.github/workflows/templates/deploy.yaml
+    with:
+      entity: ${{ inputs.entity }}
+      environment: ${{ inputs.environment }}
+    secrets:
+      KONNECT_TOKEN: ${{ secrets.KONNECT_TOKEN }}
