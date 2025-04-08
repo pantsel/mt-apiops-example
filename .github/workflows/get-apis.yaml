@@ -41,6 +41,7 @@ on:
 
 jobs:
   get-apis:
+    name: Get APIs for ${{ inputs.entity }} ${{ inputs.environment }}
     runs-on: ubuntu-latest
     outputs:
       apis: ${{ steps.set-apis.outputs.apis }}
