@@ -48,7 +48,7 @@ env:
   DECK_CONFIG_OTEL_TRACES_ENDPOINT: https://otel-${{ inputs.entity }}-${{ inputs.environment }}.local:4318/v1/traces
 jobs:
   combine:
-    name: Combine Kong Gateway configurations on ${{ inputs.entity }} ${{ inputs.environment }}
+    name: Combine configs on ${{ inputs.entity }} ${{ inputs.environment }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
