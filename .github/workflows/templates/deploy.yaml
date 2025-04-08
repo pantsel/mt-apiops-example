@@ -1,3 +1,24 @@
+# Deploy APIs
+# This workflow is responsible for deploying the combined Kong Gateway configuration for the given entity and environment
+# It is called by the main build-deploy workflow and runs in parallel for each API defined in the entity's metadata.json file
+
+# Key responsibilities:
+# 1. Downloads the combined Kong Gateway configuration
+# 2. Syncs the configuration to the Kong Gateway
+# 3. Tests the API
+# 4. Reverts to the previous configuration if the sync or tests fail
+# 5. Uploads a backup of the Kong Gateway configuration
+
+# Workflow inputs:
+# - entity: The entity (e.g., tripwhiz, roameasy) to deploy configurations for
+# - environment: Target environment (development, acceptance, production)
+
+# Main outputs:
+# - Generates a backup of the Kong Gateway configuration
+# - Each artifact follows the pattern: backup-{entity}-{environment}.yaml
+
+
+
 name: Deploy API Configurations
 
 on:

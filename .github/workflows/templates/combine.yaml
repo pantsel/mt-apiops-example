@@ -1,3 +1,24 @@
+
+# Combine APIs
+# This workflow is responsible for combining the API configurations for the given entity and environment
+# It is called by the main build-deploy workflow and runs in parallel for each API defined in the entity's metadata.json file
+
+# Key responsibilities:
+# 1. Downloads API configurations from previous build steps
+# 2. Merges API configurations into a single file
+# 3. Applies governance plugins and patches
+# 4. Renders the combined configuration
+# 5. Validates and lints the combined configuration
+
+# Workflow inputs:
+# - entity: The entity (e.g., tripwhiz, roameasy) to combine configurations for
+# - environment: Target environment (development, acceptance, production)
+# - show_summary: Whether to show a summary of the combined configuration
+
+# Main outputs:
+# - Generates a combined Kong Gateway configuration file
+# - Each artifact follows the pattern: kong-combined-{entity}-{environment}.yaml
+
 name: Combine API Configurations
 
 on:

@@ -1,3 +1,29 @@
+## Build APIs
+# This workflow is responsible for building Kong Gateway configurations for each API
+# It is called by the main build-deploy workflow and runs in parallel for each API defined in the entity's metadata.json file
+
+# Key responsibilities:
+# 1. Processes OpenAPI specifications for each API version
+# 2. Applies entity-specific Kong Gateway configurations
+# 3. Validates configurations against governance rules
+# 4. Generates deployable Kong Gateway configurations
+# 5. Runs as a matrix job to handle multiple APIs concurrently
+
+# Workflow inputs:
+# - entity: The entity (e.g., tripwhiz, roameasy) to build configurations for
+# - environment: Target environment (development, acceptance, production)
+# - apis: JSON array of API configurations from the entity's metadata
+
+# Main outputs:
+# - Generates artifact files containing Kong Gateway configurations for each API
+# - Each artifact follows the pattern: artifacts-{entity}-{environment}-{api-name}-{version}
+
+# Environment variables:
+# - Sets up paths for entity-specific Kong configurations
+# - Configures build-time variables for deck commands
+# - Establishes API endpoints and authentication settings
+
+
 name: Build APIs
 
 on:
