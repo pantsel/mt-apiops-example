@@ -30,9 +30,9 @@ env:
   KONNECT_CONTROL_PLANE_NAME: ${{ inputs.entity }}-${{ inputs.environment }}
   APIS_DIR: ${{ github.workspace }}/apis
   ENTITIES_DIR: ${{ github.workspace }}/entities
-  ENTITIES_DIR_KONG: ${{ github.workspace }}/entities/kong
+  ENTITIES_DIR_KONG: ${{ github.workspace }}/entities/.common/kong
   ENTITIES_ENV_VARS: ${{ github.workspace }}/entities/environments/${{ inputs.environment }}/env.sh
-  ENTITIES_COMMON_VARS: ${{ github.workspace }}/entities/env.sh
+  ENTITIES_COMMON_VARS: ${{ github.workspace }}/entities/.common/env.sh
   ENTITY_DIR: ${{ github.workspace }}/entities/${{ inputs.entity }}
   ENTITY_DIR_KONG: ${{ github.workspace }}/entities/${{ inputs.entity }}/kong
   ENTITY_METADATA: ${{ github.workspace }}/entities/${{ inputs.entity }}/environments/${{ inputs.environment }}/metadata.json
@@ -43,7 +43,7 @@ env:
   GOVERNANCE_ENV_VARS: ${{ github.workspace }}/governance/environments/${{ inputs.environment }}/env.sh
   GOVERNANCE_COMMON_VARS: ${{ github.workspace }}/governance/env.sh
 
-  # DecK relatec variables scoped to the entity and environment
+  # DecK related variables scoped to the entity and environment
   DECK_CONFIG_OIDC_ISSUER: https://auth-${{ inputs.entity }}-${{ inputs.environment }}.myidp.com/auth/realms/master/.well-known/openid-configuration
 
 jobs:
@@ -94,35 +94,33 @@ jobs:
         run: |
           cat ${{ env.API_SPEC }} | deck file openapi2kong --generate-security -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
 
-      - name: Add plugins (API)
+      - name: Add plugins
         run: |
-          # if ./plugins exists, and has at least one file .yaml file, apply the plugins
-          if [ -d "./plugins" ] && [ "$(ls -A ./plugins/*.yaml 2>/dev/null)" ]; then
-            cat $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml | deck file add-plugins ./plugins/*.yaml -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
-          else
-            echo "No API level plugins found for ${{ matrix.api.name }}/${{ matrix.api.version }}"
-          fi
-        working-directory: ${{ env.API_KONG_DIR }}
+          plugin_folders=(
+            "${{ env.ENTITIES_DIR_KONG }}/plugins"
+            "${{ env.ENTITY_DIR_KONG }}/plugins"
+            "${{ env.API_KONG_DIR }}/plugins"
+          )
 
-      - name: Add plugins (Entity)
-        run: |
-          # if ./plugins exists, and has at least one file .yaml file, apply the plugins
-          if [ -d "./plugins" ] && [ "$(ls -A ./plugins/*.yaml 2>/dev/null)" ]; then
-            cat $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml | deck file add-plugins ./plugins/*.yaml -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
-          else
-            echo "No Entity level plugins found for ${{ inputs.entity }}"
-          fi
-        working-directory: ${{ env.ENTITY_DIR_KONG }}
+          for plugin_folder in "${plugin_folders[@]}"; do
+            if [ -d "$plugin_folder" ] && [ "$(ls -A $plugin_folder/*.yaml 2>/dev/null)" ]; then
+              cat $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml | deck file add-plugins $plugin_folder/*.yaml -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
+            fi
+          done
 
-      - name: Apply patches (Entity)
+      - name: Apply patches
         run: |
-          # if ./patches exists, and has at least one file .yaml file, apply the patches
-          if [ -d "./patches" ] && [ "$(ls -A ./patches/*.yaml 2>/dev/null)" ]; then
-            cat $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml | deck file patch ./patches/*.yaml -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
-          else
-            echo "No Entity level patches found for ${{ inputs.entity }}"
-          fi
-        working-directory: ${{ env.ENTITY_DIR_KONG }}
+          patch_folders=(
+            "${{ env.ENTITIES_DIR_KONG }}/patches"
+            "${{ env.ENTITY_DIR_KONG }}/patches"
+            "${{ env.API_KONG_DIR }}/patches"
+          )
+
+          for patch_folder in "${patch_folders[@]}"; do
+            if [ -d "$patch_folder" ] && [ "$(ls -A $patch_folder/*.yaml 2>/dev/null)" ]; then
+              cat $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml | deck file patch $patch_folder/*.yaml -o $OUTPUT_DIR/${{ matrix.api.name }}-${{ matrix.api.version }}-kong.yaml
+            fi
+          done
 
       - name: Add namespace if required
         run: |
