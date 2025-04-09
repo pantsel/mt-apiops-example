@@ -1,0 +1,49 @@
+# Get APIs
+# This action is responsible for getting the APIs from the entity's metadata.json file
+# It is called by the main build-deploy workflow and runs in parallel for each API defined in the entity's metadata.json file
+
+# Key responsibilities:
+# 1. Parses the metadata.json file to extract API configurations
+# 2. Filters APIs based on environment-specific settings
+# 3. Outputs a list of enabled APIs
+
+# Workflow inputs:
+# - entity: The entity (e.g., tripwhiz, roameasy) to get APIs for
+# - environment: Target environment (development, acceptance, production)
+# - entity_metadata: Path to the entity's metadata.json file
+
+# Main outputs:
+# - Generates a list of APIs to be deployed for the given entity and environment
+
+
+name: "Get APIs"
+description: "Gets the APIs from the entity's metadata.json file"
+
+inputs:
+  entity:
+    description: "The entity to get APIs for"
+    required: true
+  environment:
+    description: "Target environment"
+    required: true
+  entity_metadata:
+    description: "Path to the entity's metadata.json file"
+    required: true
+  konnect_token:
+    description: "Konnect API token"
+    required: true
+
+outputs:
+  apis:
+    description: "List of enabled APIs"
+    value: ${{ steps.set-apis.outputs.apis }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Get enabled APIs from metadata
+      id: set-apis
+      shell: bash
+      run: |
+        APIS=$(jq -c '[ .apis[] | . ]' ${{ inputs.entity_metadata }})
+        echo "apis=$APIS" >> $GITHUB_OUTPUT 

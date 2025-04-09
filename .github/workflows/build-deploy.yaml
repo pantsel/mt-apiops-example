@@ -32,13 +32,18 @@ concurrency:
 
 jobs:
   get-apis:
-    uses: ./.github/workflows/get-apis.yaml
-    with:
-      entity: ${{ inputs.entity }}
-      environment: ${{ inputs.environment }}
-      entity_metadata: ./entities/${{ inputs.entity }}/environments/${{ inputs.environment }}/metadata.json
-    secrets:
-      KONNECT_TOKEN: ${{ secrets.KONNECT_TOKEN }}
+    runs-on: ubuntu-latest
+    outputs:
+      apis: ${{ steps.get-apis.outputs.apis }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/get-apis
+        id: get-apis
+        with:
+          entity: ${{ inputs.entity }}
+          environment: ${{ inputs.environment }}
+          entity_metadata: ./entities/${{ inputs.entity }}/environments/${{ inputs.environment }}/metadata.json
+          konnect_token: ${{ secrets.KONNECT_TOKEN }}
 
   build:
     needs: get-apis
