@@ -8,8 +8,20 @@ inputs:
   environment:
     description: "Target environment (development, acceptance, production)"
     required: true
-  api:
-    description: "JSON array of API configurations from the entity's metadata"
+  api_name:
+    description: "The name of the API to build configurations for"
+    required: true
+  api_version:
+    description: "The version of the API to build configurations for"
+    required: true
+  api_namespace:
+    description: "The namespace of the API to build configurations for"
+    required: true
+  api_enabled:
+    description: "Whether the API is enabled"
+    required: true
+  api_spec:
+    description: "The path to the OpenAPI spec for the API"
     required: true
   konnect_token:
     description: "Konnect API token"
@@ -18,101 +30,84 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - uses: actions/checkout@v4
     - uses: kong/setup-deck@v1
-    - name: Set up environment variables
+    - name: Lint OpenAPI Spec
       shell: bash
       run: |
-        echo "ENTITIES_DIR_KONG=./entities/.common/kong" >> $GITHUB_ENV
-        echo "ENTITY_DIR_KONG=./entities/${{ inputs.entity }}/kong" >> $GITHUB_ENV
-        echo "OUTPUT_DIR=./.generated" >> $GITHUB_ENV
-        echo "GOVERNANCE_DIR=./governance" >> $GITHUB_ENV
-        echo "API_SPEC=./apis/${{ inputs.api.name }}/${{ inputs.api.version }}/openapi.yaml" >> $GITHUB_ENV
-        echo "API_KONG_DIR=./apis/${{ inputs.api.name }}/${{ inputs.api.version }}/kong" >> $GITHUB_ENV
-        echo "DECK_API_NAME=${{ inputs.api.name }}" >> $GITHUB_ENV
-        echo "DECK_API_VERSION=${{ inputs.api.version }}" >> $GITHUB_ENV
-        echo "DECK_API_URL=https://${{ inputs.entity }}-${{ inputs.environment }}.${{ inputs.api.name }}.svc.cluster.local:8000" >> $GITHUB_ENV
-        echo "DECK_FILE_NAMESPACE_PATH_PREFIX=${{ inputs.api.namespace }}" >> $GITHUB_ENV
-        echo "DECK_SERVICE_ENABLED=${{ inputs.api.enabled }}" >> $GITHUB_ENV
-        echo "DECK_ENTITY_NAME=${{ inputs.entity }}-${{ inputs.environment }}" >> $GITHUB_ENV
-        echo "DECK_CONFIG_OIDC_ISSUER=https://auth-${{ inputs.entity }}-${{ inputs.environment }}.myidp.com/auth/realms/master/.well-known/openid-configuration" >> $GITHUB_ENV
+        deck file lint -s ${{ inputs.api_spec }} $GOVERNANCE_DIR/openapi.ruleset.yaml
 
-    # - name: Lint OpenAPI Spec
-    #   shell: bash
-    #   run: |
-    #     deck file lint -s $API_SPEC $GOVERNANCE_DIR/openapi.ruleset.yaml
+    - name: Convert OpenAPI Spec to Kong declarative config
+      shell: bash
+      run: |
+        cat ${{ inputs.api_spec }} | deck file openapi2kong --generate-security -o $OUTPUT_DIR/${{ inputs.api_name }}-${{ inputs.api_version }}-kong.yaml
 
-    # - name: Convert OpenAPI Spec to Kong declarative config
-    #   shell: bash
-    #   run: |
-    #     cat ${{ env.API_SPEC }} | deck file openapi2kong --generate-security -o $OUTPUT_DIR/${{ inputs.api.name }}-${{ inputs.api.version }}-kong.yaml
+    - name: Add plugins
+      shell: bash
+      run: |
+        plugin_folders=(
+          "${{ env.ENTITIES_DIR_KONG }}/plugins"
+          "${{ env.ENTITY_DIR_KONG }}/plugins"
+          "${{ env.API_KONG_DIR }}/plugins"
+        )
 
-    # - name: Add plugins
-    #   shell: bash
-    #   run: |
-    #     plugin_folders=(
-    #       "${{ env.ENTITIES_DIR_KONG }}/plugins"
-    #       "${{ env.ENTITY_DIR_KONG }}/plugins"
-    #       "${{ env.API_KONG_DIR }}/plugins"
-    #     )
+        for plugin_folder in "${plugin_folders[@]}"; do
+          if [ -d "$plugin_folder" ] && [ "$(ls -A $plugin_folder/*.yaml 2>/dev/null)" ]; then
+            cat $OUTPUT_DIR/${{ inputs.api_name }}-${{ inputs.api_version }}-kong.yaml | deck file add-plugins $plugin_folder/*.yaml -o $OUTPUT_DIR/${{ inputs.api_name }}-${{ inputs.api_version }}-kong.yaml
+          fi
+        done
 
-    #     for plugin_folder in "${plugin_folders[@]}"; do
-    #       if [ -d "$plugin_folder" ] && [ "$(ls -A $plugin_folder/*.yaml 2>/dev/null)" ]; then
-    #         cat $OUTPUT_DIR/${{ inputs.api.name }}-${{ inputs.api.version }}-kong.yaml | deck file add-plugins $plugin_folder/*.yaml -o $OUTPUT_DIR/${{ inputs.api.name }}-${{ inputs.api.version }}-kong.yaml
-    #       fi
-    #     done
+    - name: Apply patches
+      shell: bash
+      run: |
+        patch_folders=(
+          "${{ env.ENTITIES_DIR_KONG }}/patches"
+          "${{ env.ENTITY_DIR_KONG }}/patches"
+          "${{ env.API_KONG_DIR }}/patches"
+        )
 
-    # - name: Apply patches
-    #   shell: bash
-    #   run: |
-    #     patch_folders=(
-    #       "${{ env.ENTITIES_DIR_KONG }}/patches"
-    #       "${{ env.ENTITY_DIR_KONG }}/patches"
-    #       "${{ env.API_KONG_DIR }}/patches"
-    #     )
+        for patch_folder in "${patch_folders[@]}"; do
+          if [ -d "$patch_folder" ] && [ "$(ls -A $patch_folder/*.yaml 2>/dev/null)" ]; then
+            cat $OUTPUT_DIR/${{ inputs.api_name }}-${{ inputs.api_version }}-kong.yaml | deck file patch $patch_folder/*.yaml -o $OUTPUT_DIR/${{ inputs.api_name }}-${{ inputs.api_version }}-kong.yaml
+          fi
+        done
 
-    #     for patch_folder in "${patch_folders[@]}"; do
-    #       if [ -d "$patch_folder" ] && [ "$(ls -A $patch_folder/*.yaml 2>/dev/null)" ]; then
-    #         cat $OUTPUT_DIR/${{ inputs.api.name }}-${{ inputs.api.version }}-kong.yaml | deck file patch $patch_folder/*.yaml -o $OUTPUT_DIR/${{ inputs.api.name }}-${{ inputs.api.version }}-kong.yaml
-    #       fi
-    #     done
+    - name: Add namespace if required
+      shell: bash
+      run: |
+        if [ -n "$DECK_FILE_NAMESPACE_PATH_PREFIX" ] || [ -n "$DECK_FILE_NAMESPACE_HOST" ]; then
+          cmd="deck file namespace"
+          if [ -n "$DECK_FILE_NAMESPACE_PATH_PREFIX" ]; then
+            cmd="$cmd --path-prefix=$DECK_FILE_NAMESPACE_PATH_PREFIX"
+          fi
+          if [ -n "$DECK_FILE_NAMESPACE_HOST" ]; then
+            cmd="$cmd --host=$DECK_FILE_NAMESPACE_HOST"
+          fi
+          cat $OUTPUT_DIR/${{ inputs.api_name }}-${{ inputs.api_version }}-kong.yaml | $cmd -o $OUTPUT_DIR/${{ inputs.api_name }}-${{ inputs.api_version }}-kong.yaml
+        else
+          echo "Skipping namespace step as both path-prefix and host are empty."
+        fi
+      working-directory: ${{ env.OUTPUT_DIR }}
 
-    # - name: Add namespace if required
-    #   shell: bash
-    #   run: |
-    #     if [ -n "$DECK_FILE_NAMESPACE_PATH_PREFIX" ] || [ -n "$DECK_FILE_NAMESPACE_HOST" ]; then
-    #       cmd="deck file namespace"
-    #       if [ -n "$DECK_FILE_NAMESPACE_PATH_PREFIX" ]; then
-    #         cmd="$cmd --path-prefix=$DECK_FILE_NAMESPACE_PATH_PREFIX"
-    #       fi
-    #       if [ -n "$DECK_FILE_NAMESPACE_HOST" ]; then
-    #         cmd="$cmd --host=$DECK_FILE_NAMESPACE_HOST"
-    #       fi
-    #       cat $OUTPUT_DIR/${{ inputs.api.name }}-${{ inputs.api.version }}-kong.yaml | $cmd -o $OUTPUT_DIR/${{ inputs.api.name }}-${{ inputs.api.version }}-kong.yaml
-    #     else
-    #       echo "Skipping namespace step as both path-prefix and host are empty."
-    #     fi
-    #   working-directory: ${{ env.OUTPUT_DIR }}
+    - name: Add Tags
+      shell: bash
+      run: |
+        cat $OUTPUT_DIR/${{ inputs.api_name }}-${{ inputs.api_version }}-kong.yaml | deck file add-tags $DECK_API_NAME $DECK_API_VERSION -o $OUTPUT_DIR/${{ inputs.api_name }}-${{ inputs.api_version }}-kong.yaml
+      working-directory: ${{ env.ENTITY_DIR_KONG }}
 
-    # - name: Add Tags
-    #   shell: bash
-    #   run: |
-    #     cat $OUTPUT_DIR/${{ inputs.api.name }}-${{ inputs.api.version }}-kong.yaml | deck file add-tags $DECK_API_NAME $DECK_API_VERSION -o $OUTPUT_DIR/${{ inputs.api.name }}-${{ inputs.api.version }}-kong.yaml
-    #   working-directory: ${{ env.ENTITY_DIR_KONG }}
+    - name: Render Kong Gateway configuration
+      shell: bash
+      run: |
+        deck file render --populate-env-vars $OUTPUT_DIR/${{ inputs.api_name }}-${{ inputs.api_version }}-kong.yaml \
+          -o $OUTPUT_DIR/${{ inputs.api_name }}-${{ inputs.api_version }}-kong.yaml
+      working-directory: ${{ env.OUTPUT_DIR }}
 
-    # - name: Render Kong Gateway configuration
-    #   shell: bash
-    #   run: |
-    #     deck file render --populate-env-vars $OUTPUT_DIR/${{ inputs.api.name }}-${{ inputs.api.version }}-kong.yaml \
-    #       -o $OUTPUT_DIR/${{ inputs.api.name }}-${{ inputs.api.version }}-kong.yaml
-    #   working-directory: ${{ env.OUTPUT_DIR }}
+    - name: Validate Generated Kong Gateway configuration
+      shell: bash
+      run: deck file validate $OUTPUT_DIR/${{ inputs.api_name }}-${{ inputs.api_version }}-kong.yaml
+      working-directory: ${{ env.OUTPUT_DIR }}
 
-    # - name: Validate Generated Kong Gateway configuration
-    #   shell: bash
-    #   run: deck file validate $OUTPUT_DIR/${{ inputs.api.name }}-${{ inputs.api.version }}-kong.yaml
-    #   working-directory: ${{ env.OUTPUT_DIR }}
+    - uses: actions/upload-artifact@v4
+      with:
+        name: artifacts-${{ inputs.entity }}-${{ inputs.environment }}-${{ inputs.api_name }}-${{ inputs.api_version }}
+        path: ${{ env.OUTPUT_DIR }}/${{ inputs.api_name }}-${{ inputs.api_version }}-kong.yaml
 
-    # - uses: actions/upload-artifact@v4
-    #   with:
-    #     name: artifacts-${{ inputs.entity }}-${{ inputs.environment }}-${{ matrix.api.name }}-${{ matrix.api.version }}
-    #     path: $OUTPUT_DIR/${{ inputs.api.name }}-${{ inputs.api.version }}-kong.yaml

@@ -30,6 +30,14 @@ concurrency:
   group: ${{ github.workflow }}-${{ inputs.entity }}-${{ inputs.environment }}
   cancel-in-progress: true
 
+env:
+  ENTITIES_DIR_KONG: ${{ github.workspace }}/entities/.common/kong
+  ENTITY_DIR_KONG: ${{ github.workspace }}/entities/${{ inputs.entity }}/kong
+  OUTPUT_DIR: ${{ github.workspace }}/.generated
+  GOVERNANCE_DIR: ${{ github.workspace }}/governance
+  DECK_ENTITY_NAME: ${{ inputs.entity }}-${{ inputs.environment }}
+  DECK_CONFIG_OIDC_ISSUER: https://auth-${{ inputs.entity }}-${{ inputs.environment }}.myidp.com/auth/realms/master/.well-known/openid-configuration
+
 jobs:
   get-apis:
     runs-on: ubuntu-latest
@@ -44,16 +52,33 @@ jobs:
           environment: ${{ inputs.environment }}
           entity_metadata: ./entities/${{ inputs.entity }}/environments/${{ inputs.environment }}/metadata.json
           konnect_token: ${{ secrets.KONNECT_TOKEN }}
-
+    
   build:
     needs: get-apis
-    uses: ./.github/workflows/build.yaml
-    with:
-      entity: ${{ inputs.entity }}
-      environment: ${{ inputs.environment }}
-      apis: ${{ needs.get-apis.outputs.apis }}
-    secrets:
-      KONNECT_TOKEN: ${{ secrets.KONNECT_TOKEN }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        api: ${{ fromJson(needs.get-apis.outputs.apis) }}
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/build
+        with:
+          entity: ${{ inputs.entity }}
+          environment: ${{ inputs.environment }}
+          api_spec: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/openapi.yaml
+          api_name: ${{ matrix.api.name }}
+          api_version: ${{ matrix.api.version }}
+          api_namespace: ${{ matrix.api.namespace }}
+          api_enabled: ${{ matrix.api.enabled }}
+          konnect_token: ${{ secrets.KONNECT_TOKEN }}
+        env:
+          API_KONG_DIR: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/kong
+          DECK_API_NAME: ${{ matrix.api.name }}
+          DECK_API_VERSION: ${{ matrix.api.version }}
+          DECK_API_URL: https://${{ inputs.entity }}-${{ inputs.environment }}.${{ matrix.api.name }}.svc.cluster.local:8000
+          DECK_FILE_NAMESPACE_PATH_PREFIX: ${{ matrix.api.namespace }}
+          DECK_SERVICE_ENABLED: ${{ matrix.api.enabled }}
 
   combine:
     needs: [get-apis, build]
