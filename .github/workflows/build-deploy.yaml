@@ -96,11 +96,16 @@ jobs:
           environment: ${{ inputs.environment }}
           show_summary: ${{ inputs.show-summary }}
           konnect_token: ${{ secrets.KONNECT_TOKEN }}
+
   deploy:
     needs: combine
-    uses: ./.github/workflows/deploy.yaml
-    with:
-      entity: ${{ inputs.entity }}
-      environment: ${{ inputs.environment }}
-    secrets:
-      KONNECT_TOKEN: ${{ secrets.KONNECT_TOKEN }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/deploy
+        id: deploy
+        with:
+          entity: ${{ inputs.entity }}
+          environment: ${{ inputs.environment }}
+          konnect_token: ${{ secrets.KONNECT_TOKEN }}
