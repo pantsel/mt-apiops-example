@@ -1,3 +1,31 @@
+# Build APIs
+# This action is responsible for building the Kong Gateway configurations for the given API
+# It is called by the main build-deploy workflow and runs in parallel for each API defined in the entity's metadata.json file
+
+# Key responsibilities:
+# 1. Lint the OpenAPI spec
+# 2. Convert the OpenAPI spec to Kong declarative config
+# 3. Add plugins
+# 4. Apply patches
+# 5. Add namespace if required
+# 6. Add tags
+# 7. Render the Kong Gateway configuration
+# 8. Validate the Kong Gateway configuration
+
+# Action inputs:
+# - entity: The entity (e.g., tripwhiz, roameasy) to build configurations for
+# - environment: Target environment (development, acceptance, production)
+# - api_name: The name of the API to build configurations for
+# - api_version: The version of the API to build configurations for
+# - api_namespace: The namespace of the API to build configurations for
+# - api_enabled: Whether the API is enabled
+# - api_spec: The path to the OpenAPI spec for the API
+
+# Main outputs:
+# - Generates a Kong Gateway configuration file
+# - Each artifact follows the pattern: kong-combined-{entity}-{environment}.yaml
+
+
 name: "Build APIs"
 description: "Builds Kong Gateway configurations for each API"
 

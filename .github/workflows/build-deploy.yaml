@@ -37,6 +37,8 @@ env:
   GOVERNANCE_DIR: ${{ github.workspace }}/governance
   DECK_ENTITY_NAME: ${{ inputs.entity }}-${{ inputs.environment }}
   DECK_CONFIG_OIDC_ISSUER: https://auth-${{ inputs.entity }}-${{ inputs.environment }}.myidp.com/auth/realms/master/.well-known/openid-configuration
+  DECK_CONFIG_OTEL_SERVICE_NAME: kong-dp-${{ inputs.entity }}-${{ inputs.environment }}
+  DECK_CONFIG_OTEL_TRACES_ENDPOINT: https://otel-${{ inputs.entity }}-${{ inputs.environment }}.local:4318/v1/traces
 
 jobs:
   get-apis:
@@ -82,14 +84,18 @@ jobs:
 
   combine:
     needs: [get-apis, build]
-    uses: ./.github/workflows/combine.yaml
-    with:
-      entity: ${{ inputs.entity }}
-      environment: ${{ inputs.environment }}
-      show_summary: ${{ inputs.show-summary }}
-    secrets:
-      KONNECT_TOKEN: ${{ secrets.KONNECT_TOKEN }}
-
+    runs-on: ubuntu-latest
+    outputs:
+      combined_config: ${{ steps.combine.outputs.combined_config }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/combine
+        id: combine
+        with:
+          entity: ${{ inputs.entity }}
+          environment: ${{ inputs.environment }}
+          show_summary: ${{ inputs.show-summary }}
+          konnect_token: ${{ secrets.KONNECT_TOKEN }}
   deploy:
     needs: combine
     uses: ./.github/workflows/deploy.yaml

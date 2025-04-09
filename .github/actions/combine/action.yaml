@@ -1,0 +1,127 @@
+
+# Combine APIs
+# This action is responsible for combining the API configurations for the given entity and environment
+# It is called by the main build-deploy workflow and runs in parallel for each API defined in the entity's metadata.json file
+
+# Key responsibilities:
+# 1. Downloads API configurations from previous build steps
+# 2. Merges API configurations into a single file
+# 3. Applies governance plugins and patches
+# 4. Renders the combined configuration
+# 5. Validates and lints the combined configuration
+
+# Action inputs:
+# - entity: The entity (e.g., tripwhiz, roameasy) to combine configurations for
+# - environment: Target environment (development, acceptance, production)
+# - show_summary: Whether to show a summary of the combined configuration
+
+# Main outputs:
+# - Generates a combined Kong Gateway configuration file
+# - Each artifact follows the pattern: kong-combined-{entity}-{environment}.yaml
+
+name: "Combine API Configurations"
+description: "Combines API configurations for the given entity and environment"
+
+inputs:
+  entity:
+    description: "The entity (e.g., tripwhiz, roameasy) to combine configurations for"
+    required: true
+  environment:
+    description: "Target environment (development, acceptance, production)"
+    required: true
+  show_summary:
+    description: "Whether to show a summary of the combined configuration"
+    required: false
+    default: "true"
+  konnect_token:
+    description: "Konnect API token"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - uses: kong/setup-deck@v1
+
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: artifacts-${{ inputs.entity }}-${{ inputs.environment }}-*
+        path: ./downloaded
+
+    - name: Merge all artifacts into a single folder
+      shell: bash
+      run: |
+        mkdir merged-artifacts
+        find ./downloaded -type f -exec cp {} merged-artifacts/ \;
+
+    - name: Merge all artifacts into a single file
+      shell: bash
+      run: |
+        deck file merge merged-artifacts/*-kong.yaml -o ${{ env.OUTPUT_DIR }}/kong-combined.yaml
+
+    - name: Add governance plugins
+      shell: bash
+      run: |
+        cat  ${{ env.OUTPUT_DIR }}/kong-combined.yaml | deck file add-plugins ${{ env.GOVERNANCE_DIR }}/kong/plugins/*.yaml -o ${{ env.OUTPUT_DIR }}/kong-combined.yaml
+
+    - name: Apply governance patches
+      shell: bash
+      run: |
+        cat  ${{ env.OUTPUT_DIR }}/kong-combined.yaml | deck file patch ${{ env.GOVERNANCE_DIR }}/kong/patches/*.yaml -o ${{ env.OUTPUT_DIR }}/kong-combined.yaml
+
+    - name: Render merged Kong Gateway configuration
+      shell: bash
+      run: |
+        deck file render --populate-env-vars ${{ env.OUTPUT_DIR }}/kong-combined.yaml \
+          -o ${{ env.OUTPUT_DIR }}/kong-combined.yaml
+      working-directory: ${{ env.OUTPUT_DIR }}
+
+    - name: Ensure _info block is applied
+      shell: bash
+      run: |
+        cat ${{ env.OUTPUT_DIR }}/kong-combined.yaml | deck file patch ${{ env.GOVERNANCE_DIR }}/kong/patches/info.yaml -o ${{ env.OUTPUT_DIR }}/kong-combined.yaml
+      working-directory: ${{ env.OUTPUT_DIR }}
+
+    - name: Lint merged Kong Gateway configuration file
+      shell: bash
+      run: |
+        deck file lint -s ${{ env.OUTPUT_DIR }}/kong-combined.yaml ${{ env.GOVERNANCE_DIR }}/kong.ruleset.yaml;
+      working-directory: ${{ env.OUTPUT_DIR }}
+
+    - name: Validate merged Kong Gateway configuration file
+      shell: bash
+      run: |
+        deck file validate ${{ env.OUTPUT_DIR }}/kong-combined.yaml
+      working-directory: ${{ env.OUTPUT_DIR }}
+
+    - name: Debug
+      shell: bash
+      run: |
+        cat ${{ env.OUTPUT_DIR }}/kong-combined.yaml
+
+    - name: Show combined config in summary
+      if: ${{ inputs.show_summary }}
+      shell: bash
+      run: |
+          echo "### 🔧 Combined config Preview" >> $GITHUB_STEP_SUMMARY
+          echo '```yaml' >> $GITHUB_STEP_SUMMARY
+          cat ${{ env.OUTPUT_DIR }}/kong-combined.yaml >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+    - name: Show diff in summary
+      if: ${{ inputs.show_summary }}
+      shell: bash
+      run: |
+        echo "### 🔍 Diff Preview" >> $GITHUB_STEP_SUMMARY
+        echo '```diff' >> $GITHUB_STEP_SUMMARY
+        deck gateway diff ${{ env.OUTPUT_DIR }}/kong-combined.yaml  \
+          --konnect-addr="${{ env.KONNECT_API_URL }}" \
+          --konnect-token="${{ inputs.konnect_token }}" \
+          --konnect-control-plane-name="${{ env.KONNECT_CONTROL_PLANE_NAME }}" >> $GITHUB_STEP_SUMMARY
+
+    - name: Upload combined Kong Gateway configuration
+      id: upload-artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: kong-combined
+        path: ${{ env.OUTPUT_DIR }}/kong-combined.yaml 
