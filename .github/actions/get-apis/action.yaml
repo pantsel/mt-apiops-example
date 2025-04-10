@@ -29,9 +29,6 @@ inputs:
   entity_metadata:
     description: "Path to the entity's metadata.json file"
     required: true
-  konnect_token:
-    description: "Konnect API token"
-    required: true
 
 outputs:
   apis:

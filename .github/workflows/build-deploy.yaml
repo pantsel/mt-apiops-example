@@ -65,7 +65,6 @@ jobs:
           entity: ${{ inputs.entity }}
           environment: ${{ inputs.environment }}
           entity_metadata: ./entities/${{ inputs.entity }}/environments/${{ inputs.environment }}/metadata.json
-          konnect_token: ${{ secrets.KONNECT_TOKEN }}
     
   build:
     name: Build ${{ matrix.api.name }} ${{ matrix.api.version }} for ${{ inputs.entity }} ${{ inputs.environment }}
