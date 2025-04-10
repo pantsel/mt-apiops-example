@@ -42,6 +42,7 @@ env:
 
 jobs:
   get-apis:
+    name: Get APIs for ${{ inputs.entity }} in ${{ inputs.environment }}
     runs-on: ubuntu-latest
     outputs:
       apis: ${{ steps.get-apis.outputs.apis }}
@@ -56,6 +57,7 @@ jobs:
           konnect_token: ${{ secrets.KONNECT_TOKEN }}
     
   build:
+    name: Build ${{ matrix.api.name }} ${{ matrix.api.version }} for ${{ inputs.entity }} in ${{ inputs.environment }}
     needs: get-apis
     runs-on: ubuntu-latest
     strategy:
@@ -83,6 +85,7 @@ jobs:
           DECK_SERVICE_ENABLED: ${{ matrix.api.enabled }}
 
   combine:
+    name: Combine ${{ inputs.entity }} ${{ inputs.environment }} API Configurations
     needs: [get-apis, build]
     runs-on: ubuntu-latest
     outputs:
@@ -98,6 +101,7 @@ jobs:
           konnect_token: ${{ secrets.KONNECT_TOKEN }}
 
   deploy:
+    name: Deploy ${{ inputs.entity }} ${{ inputs.environment }} API Configurations
     needs: combine
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
