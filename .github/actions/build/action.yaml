@@ -51,9 +51,6 @@ inputs:
   api_spec:
     description: "The path to the OpenAPI spec for the API"
     required: true
-  konnect_token:
-    description: "Konnect API token"
-    required: true
 
 runs:
   using: "composite"
@@ -119,7 +116,7 @@ runs:
     - name: Add Tags
       shell: bash
       run: |
-        cat $OUTPUT_DIR/${{ inputs.api_name }}-${{ inputs.api_version }}-kong.yaml | deck file add-tags $DECK_API_NAME $DECK_API_VERSION -o $OUTPUT_DIR/${{ inputs.api_name }}-${{ inputs.api_version }}-kong.yaml
+        cat $OUTPUT_DIR/${{ inputs.api_name }}-${{ inputs.api_version }}-kong.yaml | deck file add-tags ${{ inputs.api_name }} ${{ inputs.api_version }} -o $OUTPUT_DIR/${{ inputs.api_name }}-${{ inputs.api_version }}-kong.yaml
       working-directory: ${{ env.ENTITY_DIR_KONG }}
 
     - name: Render Kong Gateway configuration

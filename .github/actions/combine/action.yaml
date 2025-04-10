@@ -33,8 +33,14 @@ inputs:
     description: "Whether to show a summary of the combined configuration"
     required: false
     default: "true"
+  konnect_addr:
+    description: "Address of the Konnect endpoint"
+    required: true
   konnect_token:
     description: "Konnect API token"
+    required: true
+  konnect_control_plane_name:
+    description: "Name of the Konnect control plane"
     required: true
 
 runs:
@@ -115,13 +121,13 @@ runs:
         echo "### 🔍 Diff Preview" >> $GITHUB_STEP_SUMMARY
         echo '```diff' >> $GITHUB_STEP_SUMMARY
         deck gateway diff ${{ env.OUTPUT_DIR }}/kong-combined.yaml  \
-          --konnect-addr="${{ env.KONNECT_API_URL }}" \
+          --konnect-addr="${{ inputs.konnect_addr }}" \
           --konnect-token="${{ inputs.konnect_token }}" \
-          --konnect-control-plane-name="${{ env.KONNECT_CONTROL_PLANE_NAME }}" >> $GITHUB_STEP_SUMMARY
+          --konnect-control-plane-name="${{ inputs.konnect_control_plane_name }}" >> $GITHUB_STEP_SUMMARY
 
     - name: Upload combined Kong Gateway configuration
       id: upload-artifact
       uses: actions/upload-artifact@v4
       with:
         name: kong-combined
-        path: ${{ env.OUTPUT_DIR }}/kong-combined.yaml 
+        path: ${{ env.OUTPUT_DIR }}/kong-combined.yaml

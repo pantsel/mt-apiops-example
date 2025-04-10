@@ -19,6 +19,17 @@ on:
           - acceptance
           - production
         default: development
+      konnect-addr:
+        required: true
+        type: choice
+        description: "Address of the Konnect endpoint."
+        options:
+          - https://eu.api.konghq.com
+          - https://us.api.konghq.com
+          - https://au.api.konghq.com
+          - https://me.api.konghq.com
+          - https://in.api.konghq.com
+        default: https://eu.api.konghq.com
       show-summary:
         required: false
         type: boolean
@@ -75,7 +86,6 @@ jobs:
           api_version: ${{ matrix.api.version }}
           api_namespace: ${{ matrix.api.namespace }}
           api_enabled: ${{ matrix.api.enabled }}
-          konnect_token: ${{ secrets.KONNECT_TOKEN }}
         env:
           API_KONG_DIR: ${{ github.workspace }}/apis/${{ matrix.api.name }}/${{ matrix.api.version }}/kong
           DECK_API_NAME: ${{ matrix.api.name }}
@@ -99,6 +109,8 @@ jobs:
           environment: ${{ inputs.environment }}
           show_summary: ${{ inputs.show-summary }}
           konnect_token: ${{ secrets.KONNECT_TOKEN }}
+          konnect_addr: ${{ inputs.konnect-addr }}
+          konnect_control_plane_name: ${{ inputs.entity }}-${{ inputs.environment }}
 
   deploy:
     name: Deploy ${{ inputs.entity }} ${{ inputs.environment }} Configurations
@@ -113,3 +125,5 @@ jobs:
           entity: ${{ inputs.entity }}
           environment: ${{ inputs.environment }}
           konnect_token: ${{ secrets.KONNECT_TOKEN }}
+          konnect_addr: ${{ inputs.konnect-addr }}
+          konnect_control_plane_name: ${{ inputs.entity }}-${{ inputs.environment }}

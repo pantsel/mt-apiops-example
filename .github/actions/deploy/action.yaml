@@ -31,6 +31,12 @@ inputs:
   konnect_token:
     description: "Konnect API token"
     required: true
+  konnect_addr:
+    description: "Address of the Konnect endpoint"
+    required: true
+  konnect_control_plane_name:
+    description: "Name of the Konnect control plane"
+    required: true
 
 runs:
   using: "composite"
@@ -48,19 +54,19 @@ runs:
       run: |
         deck gateway dump \
           --select-tag generated_by:apiops \
-          --konnect-addr="${{ env.KONNECT_API_URL }}" \
+          --konnect-addr="${{ inputs.konnect_addr }}" \
           --konnect-token="${{ inputs.konnect_token }}" \
-          --konnect-control-plane-name="${{ env.KONNECT_CONTROL_PLANE_NAME }}" -o ${{ env.OUTPUT_DIR }}/kong_backup.yaml
+          --konnect-control-plane-name="${{ inputs.konnect_control_plane_name }}" -o ${{ env.OUTPUT_DIR }}/kong_backup.yaml
 
-    - name: Sync Kong Gateway configuration
+    - name: Sync Kong Gateway configuration (${{ inputs.konnect_addr }})
       id: sync
       shell: bash
       run: |
         deck gateway sync ${{ env.OUTPUT_DIR }}/kong-combined.yaml  \
           --no-mask-deck-env-vars-value \
-          --konnect-addr="${{ env.KONNECT_API_URL }}" \
+          --konnect-addr="${{ inputs.konnect_addr }}" \
           --konnect-token="${{ inputs.konnect_token }}" \
-          --konnect-control-plane-name="${{ env.KONNECT_CONTROL_PLANE_NAME }}"
+          --konnect-control-plane-name="${{ inputs.konnect_control_plane_name }}"
       continue-on-error: true
 
     - name: Wait for changes to be propagated
@@ -85,9 +91,9 @@ runs:
       run: |
         deck gateway sync ${{ env.OUTPUT_DIR }}/kong_backup.yaml  \
           --no-mask-deck-env-vars-value \
-          --konnect-addr="${{ env.KONNECT_API_URL }}" \
+          --konnect-addr="${{ inputs.konnect_addr }}" \
           --konnect-token="${{ inputs.konnect_token }}" \
-          --konnect-control-plane-name="${{ env.KONNECT_CONTROL_PLANE_NAME }}"
+          --konnect-control-plane-name="${{ inputs.konnect_control_plane_name }}"
 
     - name: Get recent backup
       if: ${{ steps.test.outcome == 'success' }}
@@ -96,9 +102,9 @@ runs:
         deck gateway dump \
           --yes \
           --select-tag generated_by:apiops \
-          --konnect-addr="${{ env.KONNECT_API_URL }}" \
+          --konnect-addr="${{ inputs.konnect_addr }}" \
           --konnect-token="${{ inputs.konnect_token }}" \
-          --konnect-control-plane-name="${{ env.KONNECT_CONTROL_PLANE_NAME }}" -o ${{ env.OUTPUT_DIR }}/kong_backup.yaml
+          --konnect-control-plane-name="${{ inputs.konnect_control_plane_name }}" -o ${{ env.OUTPUT_DIR }}/kong_backup.yaml
 
     - name: Upload backup
       id: upload-backup
