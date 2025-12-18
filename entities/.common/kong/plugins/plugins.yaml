@@ -2,7 +2,7 @@
 _format_version: '3.0'
 add-plugins:
 - selectors:
-  - $..services[*].routes[?((@.name, "(?i)health-check"))]
+  - $..services[*].routes[?search(@.name, "(?i)health-check")]
   overwrite: false
   plugins:
     - name: route-transformer-advanced
@@ -12,7 +12,7 @@ add-plugins:
         path: "/health"
         port: "5432"
 - selectors:
-  - $..services[*].routes[?((@.name, "(?i)health-check"))]
+  - $..services[*].routes[?search(@.name, "(?i)health-check")]
   overwrite: false
   plugins:
     - name: openid-connect
